@@ -1,5 +1,7 @@
 # Test Cases: Vietnamese Language Support (replaces Indonesian)
 
+> **Superseded by PRD 1.14 where it differs:** as shipped, 12 English prompt snapshots carry a reasoned exemption (the 11 outreach prompts and `leadNotes.english`); only `describeStyle.english` stays byte-identical (TC-33.2, baseline claims).
+>
 > Based on [PRD](../PRD.md) (section 1, v0.3; authority: 1.4 to 1.8.5 and 1.13, where 1.8.5 overrides older wording) and [Use Cases](../use-cases/vietnamese-language_use_cases.md) (UC-1 to UC-52).
 
 | | |

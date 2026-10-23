@@ -1,5 +1,7 @@
 # Use Cases: Vietnamese Language Support (replaces Indonesian)
 
+> **Superseded by PRD 1.14 where it differs:** as shipped, 12 English prompt snapshots carry a reasoned exemption (the 11 outreach prompts and `leadNotes.english`); only `describeStyle.english` stays byte-identical (UC-33-A5 and similar claims).
+>
 > Based on [PRD](../PRD.md) section 1 (cited from outside the PRD as `1/FR-n`, `1/AC-n`; inside this file the prefix is dropped: `FR-n`, `AC-n`, `NFR-n`, `OQ-n`).
 > Created 2026-10-23: UC-1 through UC-37 for "Vietnamese language support (replaces Indonesian)". No earlier use-case file existed in `docs/use-cases/`, so this is a new file.
 > Updated 2026-10-23 (PRD v0.2, architecture review amendments): added UC-38 through UC-52 (FR-39 to FR-49, plus the parts of FR-28, FR-29, FR-30, FR-33 and FR-35 that v0.2 sharpened); corrected in place, keeping their ids: UC-1 to UC-19 (all of them), UC-21, UC-22, UC-23, UC-24, UC-25, UC-26, UC-27, UC-28, UC-30, UC-31, UC-32, UC-33, UC-35, UC-36, UC-37 (see the "Corrections made for PRD v0.2" table at the end). The traceability matrix now maps FR-1 to FR-49, AC-1 to AC-29 and NFR-1 to NFR-11.

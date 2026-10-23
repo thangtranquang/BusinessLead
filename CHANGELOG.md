@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-23
+
+### Vietnamese language support — 17:11 UTC
+**Summary:** The app and its AI-written messages now work in Vietnamese and English; Indonesian is no longer a language option.
+**Details:** EN | VI toggle; Vietnamese AI drafts, briefs, replies, email footer and unsubscribe page; Vietnamese STOP opt-out phrases. Campaign language is now vietnamese or english (others get 400; old indonesian rows read as English, not rewritten). Breaking for JWT API clients: campaign edit/delete are now workspace-scoped and the language values changed. WhatsApp export parser faster and safer. Native-speaker review of the Vietnamese wording is pending.
+
 ## Unreleased (2026-10-14)
 
 ### Added
