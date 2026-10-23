@@ -6,11 +6,13 @@ import { IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import { memoryStorage } from "multer";
 import { JwtGuard } from "../auth/jwt.guard";
 import { WorkspaceId } from "../auth/current-workspace.decorator";
+import { IsOutputLanguage, type OutputLanguage } from "../common/language";
 import { StyleService, type UploadedFile } from "./style.service";
 
-class DraftDto {
+export class DraftDto {
   @IsString() @MinLength(1) @MaxLength(2000) incoming!: string;
   @IsOptional() @IsString() @MaxLength(500) businessDescription?: string;
+  @IsOutputLanguage() language?: OutputLanguage;
 }
 class TrainDto {
   @IsString() @MinLength(1) @MaxLength(200) me!: string;
@@ -57,6 +59,6 @@ export class StyleController {
   @Post("draft")
   @ApiOperation({ summary: "Draft a reply in the owner's voice and return the full trace" })
   draft(@WorkspaceId() workspaceId: string, @Body() dto: DraftDto) {
-    return this.style.draft(workspaceId, dto.incoming, dto.businessDescription);
+    return this.style.draft(workspaceId, dto.incoming, dto.businessDescription, dto.language);
   }
 }

@@ -123,7 +123,7 @@ test("stripMarkdown removes symbols that would show literally in a message", () 
 import { withLink } from "./message-writer.service";
 
 test("withLink puts the owner's link before the closing", () => {
-  assert.equal(withLink("Halo,\n\nIsi.\n\nSalam,", "https://example.com/", "vietnamese"), "Halo,\n\nIsi.\n\nSelengkapnya: https://example.com/\n\nSalam,");
+  assert.equal(withLink("Halo,\n\nIsi.\n\nSalam,", "https://example.com/", "vietnamese"), "Halo,\n\nIsi.\n\nXem thêm: https://example.com/\n\nSalam,");
   assert.equal(withLink("Hello,\n\nBody.", "https://x.id/", "english"), "Hello,\n\nBody.\n\nMore details: https://x.id/");
 });
 

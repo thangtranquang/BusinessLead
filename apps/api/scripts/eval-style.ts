@@ -1,7 +1,7 @@
 /**
  * Offline evaluation: does style-aware drafting sound more like the owner than a generic prompt?
  *
- *   EXPORT_DIR=/path/to/extracted/exports ME="Asiifdev Digital Agency" \
+ *   EXPORT_DIR=/path/to/extracted/exports ME="Contoh Digital Agency" \
  *   OPENAI_BASE_URL=http://localhost:11434/v1 CHAT_MODEL=gemma4:latest EMBEDDING_MODEL=qwen3-embedding:latest \
  *   node --import tsx scripts/eval-style.ts
  *
@@ -10,6 +10,7 @@
  */
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { LANGUAGE_LABEL, outputLanguageOrDefault } from "../src/common/language";
 import { anonymize } from "../src/ai/chat-import/anonymize";
 import { buildDraftMessages, cosine } from "../src/ai/chat-import/style-prompt";
 import { buildReplyPairs, computeStyleStats, type ReplyPair } from "../src/ai/chat-import/style-stats";
@@ -20,6 +21,7 @@ const me = process.env.ME!;
 const base = (process.env.OPENAI_BASE_URL ?? "http://localhost:11434/v1").replace(/\/$/, "");
 const chatModel = process.env.CHAT_MODEL ?? "gemma4:latest";
 const embModel = process.env.EMBEDDING_MODEL ?? "qwen3-embedding:latest";
+const language = outputLanguageOrDefault(process.env.LANGUAGE); // "vietnamese" (default) or "english"
 const N = Number(process.env.SAMPLES ?? 30);
 const out = process.env.OUT ?? "/tmp/eval-style-samples.json";
 const headers = { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY ?? "ollama"}` };
@@ -61,7 +63,7 @@ const trainPairs = train.filter(usable);
 const testPairs = test.filter(usable).filter((_, i) => i % Math.max(1, Math.floor(test.length / N)) === 0).slice(0, N);
 console.log(`train pairs ${trainPairs.length}, test pairs ${testPairs.length}, my messages in train ${style.messageCount}`);
 
-const BASE_SYSTEM = "Kamu adalah admin sebuah bisnis rental. Balas pesan pelanggan WhatsApp dengan sopan, jelas, dan membantu dalam Bahasa Indonesia. Tulis HANYA isi pesan balasan.";
+const BASE_SYSTEM = `You are the admin of a rental business. Reply to the customer's WhatsApp message politely, clearly and helpfully in ${LANGUAGE_LABEL[language]}. Write ONLY the reply message.`;
 const stat = (s: string) => ({ len: s.length, emoji: /\p{Extended_Pictographic}/u.test(s), lower: /^\p{Ll}/u.test(s), end: /[.!?]$/.test(s.trim()) });
 
 const run = async () => {
@@ -70,12 +72,12 @@ const run = async () => {
   for (const [i, t] of testPairs.entries()) {
     const [qv] = await embed([t.incoming]);
     const examples = trainVecs.map((v, j) => ({ j, s: cosine(qv, v) })).sort((a, b) => b.s - a.s).slice(0, 5).map((x) => trainPairs[x.j]);
-    const baseline = await chat([{ role: "system", content: BASE_SYSTEM }, { role: "user", content: `Pelanggan: ${t.incoming}\nBalasan:` }]);
-    const styled = await chat(buildDraftMessages({ businessDescription: "bisnis rental dan software sistem rental (Asiifdev Digital Agency)", style, examples, incoming: t.incoming }));
+    const baseline = await chat([{ role: "system", content: BASE_SYSTEM }, { role: "user", content: `Them: ${t.incoming}\nMe:` }]);
+    const styled = await chat(buildDraftMessages({ language, businessDescription: "bisnis rental dan software sistem rental (Contoh Digital Agency)", style, examples, incoming: t.incoming }));
     // blind judge: which candidate is closer to the real reply in tone, length and wording?
     const flip = i % 2 === 1;
     const [A, B] = flip ? [styled, baseline] : [baseline, styled];
-    const verdict = (await chat([{ role: "user", content: `Balasan asli pemilik: """${t.reply}"""\n\nKandidat A: """${A}"""\n\nKandidat B: """${B}"""\n\nKandidat mana yang paling mirip dengan balasan asli dalam nada, panjang, dan pilihan kata? Jawab hanya satu huruf: A atau B.` }], 0)).match(/[AB]/)?.[0];
+    const verdict = (await chat([{ role: "user", content: `The owner's real reply: """${t.reply}"""\n\nCandidate A: """${A}"""\n\nCandidate B: """${B}"""\n\nWhich candidate is closest to the real reply in tone, length and word choice? Answer with one letter only: A or B.` }], 0)).match(/[AB]/)?.[0];
     const styledWon = verdict ? (verdict === "A") === flip : null;
     rows.push({ incoming: t.incoming, real: t.reply, baseline, styled, styledWon });
     console.log(`[${i + 1}/${testPairs.length}] real ${t.reply.length} | baseline ${baseline.length} | styled ${styled.length} | winner ${styledWon === null ? "?" : styledWon ? "styled" : "baseline"}`);

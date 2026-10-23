@@ -20,12 +20,12 @@ test("the draft prompt carries the brief: matched angle, allowed proof, words to
   const brief = briefForDraft("Kami membuat sistem sewa.", c, { name: "Rental Kamera Solo", category: "Toko Kamera" });
   const m = buildOutreachMessages({ businessDescription: "X", offer: "sistem sewa", language: "vietnamese", lead: { name: "Rental Kamera Solo" }, brief });
   const sys = m[0].content;
-  assert.match(sys, /BRIEF PEMASARAN/);
-  assert.match(sys, /masalah yang mungkin dirasakan: Stok bentrok; manfaat: Jadwal dan stok satu layar/);
-  assert.match(sys, /Bukti yang BOLEH disebut.*Klien Contoh; 200\+ stars/);
-  assert.match(sys, /Hindari kata: solusi, inovatif/);
+  assert.match(sys, /MARKETING BRIEF/);
+  assert.match(sys, /possible problem: Stok bentrok; benefit: Jadwal dan stok satu layar/);
+  assert.match(sys, /Evidence that MAY be mentioned.*Klien Contoh; 200\+ stars/);
+  assert.match(sys, /Avoid these words: solusi, inovatif/);
   const none = buildOutreachMessages({ businessDescription: "X", offer: "o", language: "vietnamese", lead: { name: "Y" }, brief: { summary: "s", proof: [], wordsToAvoid: [] } })[0].content;
-  assert.match(none, /Tidak ada bukti yang boleh disebut/);
+  assert.match(none, /No evidence to mention/);
   assert.doesNotMatch(buildOutreachMessages({ businessDescription: "X", offer: "o", language: "vietnamese", lead: { name: "Y" } })[0].content, /BRIEF PEMASARAN/);
 });
 

@@ -4,7 +4,9 @@ import { unzipSync } from "fflate";
 import { PrismaService } from "../prisma/prisma.service";
 import { AiClientService } from "./ai-client.service";
 import { anonymize } from "./chat-import/anonymize";
-import { buildDraftMessages } from "./chat-import/style-prompt";
+import { buildDraftMessages, DEFAULT_BUSINESS_TEXT } from "./chat-import/style-prompt";
+import { nfc } from "../common/text";
+import { outputLanguageOrDefault } from "../common/language";
 import { buildReplyPairs, computeStyleStats, type StyleStats } from "./chat-import/style-stats";
 import { parseWhatsAppExport, type ParsedChat } from "./chat-import/whatsapp-export-parser";
 import { KnowledgeService } from "./knowledge.service";
@@ -140,7 +142,8 @@ export class StyleService {
    * Drafts a reply in the owner's voice and returns the full trace (style used, examples retrieved,
    * facts found) so the user can see why the draft says what it says.
    */
-  async draft(workspaceId: string, incoming: string, businessDescription?: string) {
+  async draft(workspaceId: string, incoming: string, businessDescription?: string, language?: unknown) {
+    const lang = outputLanguageOrDefault(language);
     const ai = await this.ai.forWorkspace(workspaceId);
     if (!ai.enabled) throw new ServiceUnavailableException("AI provider is not configured");
     const started = Date.now();
@@ -152,7 +155,8 @@ export class StyleService {
 
     const facts = await this.knowledge.search(workspaceId, incoming);
     const messages = buildDraftMessages({
-      businessDescription: businessDescription || "bisnis milik pengguna",
+      businessDescription: businessDescription || DEFAULT_BUSINESS_TEXT[lang],
+      language: lang,
       style: stats,
       examples: examples.map((e) => ({ incoming: e.incoming, reply: e.reply, at: new Date() })),
       knowledge: facts.confidence === "none" ? [] : facts.hits.map((h) => h.content),
@@ -176,7 +180,7 @@ export class StyleService {
     });
     if (error) throw new ServiceUnavailableException("The AI provider could not write a draft. Check its settings and try again.");
     return {
-      draft: normalizeDraft(draft.trim(), { language: "auto", names: [profile.ownerName] }),
+      draft: normalizeDraft(nfc(draft).trim(), { language: lang, names: [profile.ownerName] }),
       trace: { style: stats, examples, knowledge: facts, model: ai.chatModel, latencyMs },
     };
   }

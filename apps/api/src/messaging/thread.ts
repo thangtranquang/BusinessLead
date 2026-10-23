@@ -27,10 +27,15 @@ export function buildThread(lines: ThreadLine[], latest: string): { history: str
   };
 }
 
+/** The text of every line of ours in a history built by `buildThread`, oldest first (a customer line is labelled `Them:`, never `Me:`). */
+export function ownLines(history: string): string[] {
+  return typeof history === "string" ? history.split("\n").filter((l) => l.startsWith(ME_PREFIX)).map((l) => l.slice(ME_PREFIX.length).trim()) : [];
+}
+
 /** The text of our own last line in a history built by `buildThread` (a line the customer wrote can never start with our label). */
 export function lastOwnLine(history: string): string {
-  const line = history.split("\n").reverse().find((l) => l.startsWith(ME_PREFIX));
-  return line ? line.slice(ME_PREFIX.length).trim() : "";
+  const lines = ownLines(history);
+  return lines.length ? lines[lines.length - 1] : "";
 }
 
 /** One message of a lead's conversation, from either side. `auto` marks a shop's automatic message (not a person speaking). */

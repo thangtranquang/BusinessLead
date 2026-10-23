@@ -6,6 +6,7 @@ import { PartialType } from "@nestjs/swagger";
 import { CreateCampaignDto } from "../campaigns/dto/create-campaign.dto";
 import { UpdateCampaignDto } from "../campaigns/dto/update-campaign.dto";
 import { GenerateDto } from "../marketing/marketing.controller";
+import { DraftDto } from "../ai/style.controller";
 import { ApplyTemplateDto, GenerateTemplateDto } from "../messaging/template.controller";
 
 // TC-26.1, 9.8, 14.6, 50.2, 50.7 and DT-21. The POST /style/draft DTO joins this matrix in the slice that adds it (FR-43).
@@ -21,6 +22,7 @@ const DTOS: { name: string; metatype: Ctor; body: Record<string, unknown> }[] = 
   { name: "UpdateCampaignDto", metatype: UpdateCampaignDto, body: {} },
   { name: "GenerateDto (brief)", metatype: GenerateDto, body: {} },
   { name: "GenerateTemplateDto", metatype: GenerateTemplateDto, body: { segment: "Quán cà phê", channel: "whatsapp" } },
+  { name: "DraftDto (style draft)", metatype: DraftDto, body: { incoming: "Giá bao nhiêu?" } },
   { name: "ApplyTemplateDto", metatype: ApplyTemplateDto, body: { channel: "whatsapp", leadIds: ["lead-1"], body: "Xin chào {nama}" } },
 ];
 
