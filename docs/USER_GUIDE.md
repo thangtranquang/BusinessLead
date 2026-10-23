@@ -1,96 +1,104 @@
-# Prospex — User Guide
+# Prospex: Hướng dẫn sử dụng
 
-Panduan lengkap penggunaan Prospex dari instalasi hingga close deals pertama.
+Hướng dẫn đầy đủ về cách dùng Prospex, từ cài đặt đến thương vụ đầu tiên được chốt.
 
----
-
-## Daftar Isi
-
-1. [Instalasi & Setup](#1-instalasi--setup)
-2. [Konfigurasi AI Provider](#2-konfigurasi-ai-provider)
-3. [Membuat Campaign](#3-membuat-campaign)
-4. [Memantau Progress Scraping](#4-memantau-progress-scraping)
-5. [Mengelola Leads](#5-mengelola-leads)
-6. [Brief Pemasaran](#6-brief-pemasaran)
-7. [Gaya AI: pesan dengan suara Anda](#7-gaya-ai-pesan-dengan-suara-anda)
-8. [Kotak Keluar dan WhatsApp](#8-kotak-keluar-dan-whatsapp)
-9. [CRM Pipeline](#9-crm-pipeline)
-10. [Analytics](#10-analytics)
-11. [Export Leads](#11-export-leads)
-12. [Settings & API Keys](#12-settings--api-keys)
-13. [Troubleshooting](#13-troubleshooting)
+> **Về các tên trên màn hình.** Hướng dẫn này trích tên nút, tab và nhãn đúng như giao diện tiếng Việt đang hiển thị (bật bằng nút **VI** ở đầu trang). Nếu bạn dùng giao diện tiếng Anh (**EN**), các tên đó nằm ở từ điển `apps/web/src/lib/i18n/en.ts`. Bản dịch tiếng Việt của giao diện và của hướng dẫn này **chưa được người bản ngữ rà soát**; nếu thấy chỗ nào chưa tự nhiên, hãy báo qua issue.
 
 ---
 
-## 1. Instalasi & Setup
+## Mục lục
 
-### Prasyarat
+1. [Cài đặt và thiết lập](#1-cài-đặt-và-thiết-lập)
+2. [Cấu hình nhà cung cấp AI](#2-cấu-hình-nhà-cung-cấp-ai)
+3. [Tạo chiến dịch](#3-tạo-chiến-dịch)
+4. [Theo dõi tiến trình thu thập dữ liệu](#4-theo-dõi-tiến-trình-thu-thập-dữ-liệu)
+5. [Quản lý khách hàng tiềm năng](#5-quản-lý-khách-hàng-tiềm-năng)
+6. [Brief marketing](#6-brief-marketing)
+7. [Phong cách AI: tin nhắn mang giọng văn của bạn](#7-phong-cách-ai-tin-nhắn-mang-giọng-văn-của-bạn)
+8. [Outbox và WhatsApp](#8-outbox-và-whatsapp)
+9. [Pipeline CRM](#9-pipeline-crm)
+10. [Phân tích](#10-phân-tích)
+11. [Xuất danh sách khách hàng tiềm năng](#11-xuất-danh-sách-khách-hàng-tiềm-năng)
+12. [Cài đặt và khóa API](#12-cài-đặt-và-khóa-api)
+13. [Khắc phục sự cố](#13-khắc-phục-sự-cố)
 
-- Node.js 20+ (disarankan 22 LTS)
-- pnpm 9+ — `npm install -g pnpm`
+---
+
+## 1. Cài đặt và thiết lập
+
+### Yêu cầu
+
+- Node.js 20+ (khuyến nghị 22 LTS)
+- pnpm 9+: `npm install -g pnpm`
 - Docker Desktop
 
-> **Stack:** Next.js 16, NestJS 10, PostgreSQL 16, Redis 7
+> **Công nghệ:** Next.js 16, NestJS 10, PostgreSQL 16, Redis 7
 
-### Langkah instalasi
+### Các bước cài đặt
 
 ```bash
-# Clone repo
+# Tải mã nguồn
 git clone https://github.com/asiifdev/business-leads-ai-automation.git
 cd business-leads-ai-automation
 
-# Install semua dependencies
+# Cài mọi thư viện
 pnpm install
 
-# Salin file konfigurasi
+# Sao chép tệp cấu hình
 cp .env.example apps/api/.env
 cp .env.example packages/database/.env
 ```
 
-Edit `apps/api/.env` minimal dengan:
+Chỉnh `apps/api/.env`, tối thiểu cần:
 
 ```env
 DATABASE_URL="postgresql://prospex:prospex@localhost:5432/prospex"
-OPENAI_API_KEY=sk-your-key-here   # boleh dikosongkan: fitur AI mati, scraping dan scoring tetap jalan
+OPENAI_API_KEY=sk-your-key-here   # có thể để trống: các tính năng AI tắt, thu thập dữ liệu và chấm điểm vẫn chạy
 OPENAI_MODEL=gpt-4o-mini
-EMBEDDING_MODEL=text-embedding-3-small   # untuk Gaya AI dan basis pengetahuan
+EMBEDDING_MODEL=text-embedding-3-small   # cho Phong cách AI và cơ sở kiến thức
 ```
 
-### Jalankan infrastruktur
+### Chạy hạ tầng
 
 ```bash
-# Mulai PostgreSQL (dengan pgvector) + Redis
+# Khởi động PostgreSQL (có pgvector) và Redis
 docker compose up -d
 
-# Terapkan migrasi database
+# Áp dụng các migration của cơ sở dữ liệu
 pnpm --filter @prospex/database db:deploy
 pnpm --filter @prospex/database exec prisma generate
 
-# Pasang browser untuk scraping Google Maps dan membaca situs (sekali saja)
+# Cài trình duyệt để thu thập dữ liệu Google Maps và đọc website (chỉ một lần)
 pnpm --filter @prospex/api exec playwright install chromium
 ```
 
-### Jalankan aplikasi
+> **Nâng cấp từ bản cũ dùng tiếng Indonesia?** Xem mục "Upgrade notes" trong [README](../README.md#language): lệnh `db:deploy` ở trên cũng áp dụng migration đổi ngôn ngữ mặc định sang tiếng Việt, và các chiến dịch cũ đang lưu `indonesian` sẽ được hiểu là tiếng Anh.
 
-Buka dua terminal:
+### Chạy ứng dụng
+
+Mở hai terminal:
 
 ```bash
-# Terminal 1 — Backend API (port 3001)
+# Terminal 1: API backend (cổng 3001)
 pnpm --filter @prospex/api dev
 
-# Terminal 2 — Dashboard (port 3000)
+# Terminal 2: giao diện web (cổng 3000)
 pnpm --filter @prospex/web dev
 ```
 
-Buka browser: **http://localhost:3000**
+Mở trình duyệt: **http://localhost:3000**
+
+### Ngôn ngữ giao diện
+
+Ở đầu trang và ở trang đăng nhập có nút chọn **EN | VI**. Lựa chọn được lưu trong một cookie của trình duyệt; khi chưa chọn gì, giao diện hiện tiếng Anh. Ngày giờ và số tự đổi theo ngôn ngữ đã chọn. Đây chỉ là ngôn ngữ của giao diện: ngôn ngữ mà AI dùng để soạn tin nhắn được chọn riêng cho từng chiến dịch (xem [mục 3](#ngôn-ngữ-soạn-tin)).
 
 ---
 
-## 2. Konfigurasi AI Provider
+## 2. Cấu hình nhà cung cấp AI
 
-Prospex mendukung penyedia AI mana pun yang kompatibel dengan API OpenAI. Draf pesan membutuhkan **model chat**, sedangkan Gaya AI dan basis pengetahuan juga membutuhkan **model embedding** (`EMBEDDING_MODEL`).
+Prospex hỗ trợ mọi nhà cung cấp AI tương thích API OpenAI. Soạn bản nháp cần **mô hình chat**, còn Phong cách AI và cơ sở kiến thức cần thêm **mô hình embedding** (`EMBEDDING_MODEL`).
 
-> **Dua tempat mengatur AI.** File `.env` server (`OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `EMBEDDING_MODEL`) berlaku untuk semua workspace dan butuh restart API. Di **Settings → AI Configuration** tiap workspace bisa menyimpan kunci, model, model embedding, dan base URL sendiri; ini menggantikan `.env` untuk workspace itu saja dan berlaku tanpa restart. Workspace tanpa kunci sendiri memakai `.env`.
+> **Hai nơi để cấu hình AI.** Tệp `.env` của máy chủ (`OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `EMBEDDING_MODEL`) áp dụng cho mọi không gian làm việc và cần khởi động lại API. Trong **Cài đặt**, tab **AI và khóa API**, mục **Cấu hình AI**, mỗi không gian làm việc có thể lưu khóa, mô hình, mô hình embedding và URL gốc riêng; cấu hình này thay thế `.env` chỉ cho không gian đó và có hiệu lực ngay, không cần khởi động lại. Không gian làm việc chưa có khóa riêng sẽ dùng `.env`.
 
 ### OpenAI
 
@@ -100,7 +108,7 @@ OPENAI_MODEL=gpt-4o-mini
 EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-### OpenRouter (akses Claude, Gemini, Llama, dll.)
+### OpenRouter (truy cập Claude, Gemini, Llama, v.v.)
 
 ```env
 OPENAI_API_KEY=sk-or-v1-...
@@ -108,13 +116,13 @@ OPENAI_BASE_URL=https://openrouter.ai/api/v1
 OPENAI_MODEL=anthropic/claude-haiku-4-5
 ```
 
-OpenRouter tidak menyediakan embedding yang cocok untuk semua model, jadi periksa apakah `EMBEDDING_MODEL` yang Anda pilih tersedia.
+OpenRouter không có mô hình embedding phù hợp cho mọi mô hình, nên hãy kiểm tra `EMBEDDING_MODEL` bạn chọn có sẵn hay không.
 
-### Ollama (lokal, gratis, offline)
+### Ollama (chạy cục bộ, miễn phí, không cần mạng)
 
 ```bash
-ollama pull gemma4              # model chat
-ollama pull qwen3-embedding     # model embedding
+ollama pull gemma4              # mô hình chat
+ollama pull qwen3-embedding     # mô hình embedding
 ```
 
 ```env
@@ -124,518 +132,533 @@ OPENAI_MODEL=gemma4
 EMBEDDING_MODEL=qwen3-embedding
 ```
 
-Model lokal butuh sekitar 40 detik per draf (tergantung perangkat). Chat Anda tidak keluar dari mesin Anda.
+Mô hình chạy cục bộ mất khoảng 40 giây cho mỗi bản nháp (tùy máy). Các cuộc trò chuyện của bạn không rời khỏi máy.
 
-> **Tanpa AI key:** scraping, scoring (berbasis aturan), CRM, analytics, dan export tetap berfungsi penuh. Fitur AI (draf pesan, Gaya AI, basis pengetahuan) tidak aktif. Prospex tidak mengisinya dengan teks template.
+> **Khi chưa có khóa AI:** thu thập dữ liệu, chấm điểm (theo quy tắc), CRM, phân tích và xuất dữ liệu vẫn hoạt động đầy đủ. Các tính năng AI (soạn bản nháp, Phong cách AI, cơ sở kiến thức) không hoạt động. Prospex không điền sẵn văn bản mẫu thay cho AI.
 
----
-
-## 3. Membuat Campaign
-
-Campaign adalah unit kerja utama di Prospex. Satu campaign = satu batch pencarian leads.
-
-### Cara cepat: biarkan AI mengisi form
-
-Halaman **Kampanye baru** dibuka dengan bagian **Materi sumber** di sisi kiri. Di sana Anda memberi AI bahan untuk mengenal produk atau layanan Anda:
-
-| Sumber | Cara | Catatan |
-|--------|------|---------|
-| **Situs web** | Isi alamat utama, mis. `https://perusahaananda.com`, lalu **Baca situs** | Cukup alamat utama. Prospex membaca `llms.txt`, sitemap, dan tautan di beranda, sampai 40 halaman, dan membuka halaman yang butuh JavaScript dengan browser sungguhan. Prosesnya berjalan di latar belakang; status tampil di daftar sumber. |
-| **Teks** | Tab *Teks*, beri judul, tempel isi (daftar harga, FAQ, deskripsi) | Minimal 30 karakter |
-| **Berkas** | Tab *Berkas*, pilih `.pdf`, `.docx`, `.md`, atau `.txt` | PDF dan DOCX maksimal 10 MB (PDF sampai 60 halaman); berkas teks 1 MB. PDF hasil scan (tanpa teks) ditolak: tempel teksnya. |
-
-Lalu centang sumber yang ingin dipakai (sumber yang baru ditambahkan otomatis tercentang), tambahkan catatan bila perlu (tautan *Hal lain yang perlu diketahui AI*), dan tekan **Analisis dengan AI dan isi form**. Prosesnya berjalan di latar belakang dan memakan waktu beberapa menit dengan model lokal (sekitar 3 sampai 7 menit untuk gemma4): tombol menampilkan "tahap 1 dari 3", dan Anda boleh meninggalkan halaman lalu kembali. Kalau brief sudah pernah dibuat, tombol **Isi dari brief tersimpan (instan)** mengisi form saat itu juga tanpa menjalankan AI lagi; jalankan analisis ulang hanya kalau sumber Anda berubah.
-
-Hasilnya:
-
-- Form di sisi kanan terisi: nama kampanye, jenis bisnis target, lokasi, kata kunci pencarian, deskripsi layanan, gaya konten, dan bahasa. Setiap isian dari AI diberi tanda **AI**.
-- Bagian yang tidak bisa ditentukan dari sumber (lokasi biasanya) **dibiarkan kosong** dan dicantumkan di kotak "Tidak ditemukan di sumber Anda".
-- Isian yang sudah Anda ketik sendiri **tidak pernah ditimpa**.
-- Periksa semuanya, koreksi yang kurang pas, lalu tekan **Mulai kampanye**.
-
-Hasil analisis disimpan sebagai **Brief Pemasaran** (bagian 6), yang juga dipakai saat AI menilai lead dan menulis draf.
-
-### Mengisi form sendiri
-
-Anda tetap bisa mengisi form tanpa sumber:
-
-| Field | Contoh | Keterangan |
-|-------|--------|------------|
-| Nama kampanye | "Rental kamera Solo Q4 2026" | Nama untuk identifikasi |
-| Jenis bisnis target | rental kamera | **Jenis bisnis yang ingin Anda temukan**, bukan bidang usaha Anda sendiri. Teks bebas; tidak ada daftar tetap karena kategori Google Maps sangat beragam. |
-| Lokasi | Solo | Kota/area target. Beberapa area dipisah koma, titik koma, `/`, `&`, `+`, "dan", atau baris baru. Kota yang Anda ketik dicari di kota itu sendiri (hasil lebih dari sekitar 50 km dari pusat kota dibuang). Ketik **Seluruh Indonesia** untuk satu pencarian per kota, dimulai dari kota terbesar. |
-| Kata kunci pencarian | "sewa kamera" | Seperti yang Anda ketik di Google Maps. Boleh lebih dari satu. |
-| Layanan / produk Anda | "Sistem manajemen sewa untuk rental kamera" | Apa yang Anda tawarkan kepada lead ini |
-| Hasil maksimum | 20 | Jumlah lead target (10 sampai 1.500 di form; API menerima sampai 2.000). Untuk target besar pakai "Seluruh Indonesia" dan beberapa kata kunci. Kampanye berhenti begitu target tercapai. |
-| Gaya konten | Seimbang | Profesional / Ramah / Seimbang / Santai |
-| Bahasa | Indonesia | Bahasa draf pesan |
-
-Klik **Mulai kampanye**: sistem langsung mulai mencari di Google Maps dan menilai hasilnya.
-
-### Tips kata kunci
-
-- Sebut jenis tempat usaha seperti yang tertulis di Google Maps: `"toko handphone"`, `"klinik gigi"`, `"rental mobil"`.
-- Jangan memakai nama layanan Anda sendiri (`"jasa pembuatan website"`) atau jabatan (`"manajer operasional"`): itu sesama penyedia jasa atau orangnya, bukan bisnis yang dicari di Maps. Prospex membuang isian seperti itu dari saran AI.
-- Tambahkan beberapa kata kunci untuk jangkauan lebih luas.
-- Spesifik lokasi: `"salon kecantikan menteng"` lebih baik dari `"salon"`.
-
-### Syarat scraping
-
-Scraping memakai browser Chromium di server. Pasang sekali dengan `pnpm --filter @prospex/api exec playwright install chromium`. Bila browser tidak ada atau pencarian gagal, campaign berstatus **Gagal** dengan pesan yang jelas. Prospex tidak pernah mengisi daftar lead dengan bisnis karangan.
+> **Về chất lượng tiếng Việt.** Văn bản tiếng Việt do AI viết được kiểm tra bằng mã (đủ dấu, xưng hô lịch sự "anh/chị", không dùng tiếng lóng, có từ để hỏi, số như "2.000.000đ" và "4,5 sao"), nhưng mới được thử với câu trả lời giả lập, chưa thử với một mô hình thật, và chưa được người bản ngữ rà soát. Hãy đọc kỹ từng bản nháp trước khi duyệt.
 
 ---
 
-## 4. Memantau Progress Scraping
+## 3. Tạo chiến dịch
 
-Setelah campaign dibuat, halaman detail campaign menampilkan progress secara real-time.
+Chiến dịch là đơn vị làm việc chính của Prospex. Một chiến dịch là một đợt tìm khách hàng tiềm năng.
 
-### Status campaign
+### Cách nhanh: để AI điền biểu mẫu
 
-| Status | Warna | Arti |
-|--------|-------|------|
-| `draft` | Abu-abu | Belum dimulai |
-| `running` | Biru + spinner | Sedang scraping & scoring |
-| `completed` | Hijau | Selesai, leads tersedia |
-| `failed` | Merah | Gagal. Penyebabnya ditampilkan (mis. browser belum terpasang); lihat juga log API |
+Trang **Chiến dịch mới** mở ra với phần **Tài liệu nguồn** ở bên trái. Tại đây bạn đưa cho AI tài liệu để hiểu sản phẩm hoặc dịch vụ của bạn:
 
-### Progress bar
+| Nguồn | Cách làm | Ghi chú |
+|-------|----------|---------|
+| **Website** | Nhập địa chỉ chính, ví dụ `https://www.example.com`, rồi bấm **Đọc website** | Chỉ cần địa chỉ chính. Prospex đọc `llms.txt`, sitemap và các liên kết ở trang chủ, tối đa 40 trang, và mở những trang cần JavaScript bằng một trình duyệt thật. Quá trình chạy ngầm; trạng thái hiện trong danh sách nguồn. |
+| **Văn bản** | Tab *Văn bản*, đặt tiêu đề, dán nội dung (bảng giá, câu hỏi thường gặp, mô tả) | Tối thiểu 30 ký tự |
+| **Tệp** | Tab *Tệp*, chọn `.pdf`, `.docx`, `.md` hoặc `.txt` | PDF và DOCX tối đa 10 MB (PDF tối đa 60 trang); tệp văn bản 1 MB. PDF dạng ảnh quét (không có chữ) bị từ chối: hãy dán nội dung vào. |
 
-Progress diupdate otomatis setiap 2 detik:
+Sau đó đánh dấu các nguồn muốn dùng (nguồn vừa thêm tự được đánh dấu), thêm ghi chú nếu cần (ô **Điều gì khác AI nên biết (không bắt buộc)**), rồi bấm **Phân tích bằng AI và điền biểu mẫu**. Quá trình chạy ngầm và mất vài phút với mô hình cục bộ (khoảng 3 đến 7 phút với gemma4): nút hiện "Đang phân tích, bước 1/3" và bạn có thể rời trang rồi quay lại. Nếu đã từng tạo brief, nút **Điền từ brief đã lưu của tôi (tức thì)** điền biểu mẫu ngay mà không chạy lại AI; chỉ phân tích lại khi các nguồn thay đổi.
 
-- **0–30%** — Inisialisasi & scraping
-- **30–60%** — AI scoring semua leads
-- **60–95%** — Menilai kecocokan tiap bisnis dengan penawaran Anda (butuh penyedia AI) dan menyiapkan catatan email dan telepon untuk lead prioritas HIGH
-- **100%** — Selesai
+Kết quả:
 
----
+- Biểu mẫu bên phải được điền: tên chiến dịch, loại hình doanh nghiệp mục tiêu, địa điểm, từ khóa tìm kiếm, mô tả dịch vụ, phong cách nội dung và ngôn ngữ. Mỗi trường do AI điền có nhãn **AI đã điền, vui lòng kiểm tra**.
+- Phần không xác định được từ nguồn (thường là địa điểm) được **để trống** và liệt kê trong hộp "Không tìm thấy trong các nguồn của bạn, nên để bạn tự điền:".
+- Trường bạn đã tự gõ **không bao giờ bị ghi đè**.
+- Kiểm tra tất cả, sửa chỗ chưa đúng, rồi bấm **Bắt đầu chiến dịch**.
 
-## 5. Mengelola Leads
+Kết quả phân tích được lưu thành **Brief marketing** ([mục 6](#6-brief-marketing)), cũng được dùng khi AI đánh giá khách hàng tiềm năng và soạn bản nháp.
 
-### Halaman Leads
+### Tự điền biểu mẫu
 
-Masuk ke **Leads** di sidebar untuk melihat semua leads dari semua campaign.
+Bạn vẫn có thể điền biểu mẫu mà không cần nguồn:
 
-**Filter tersedia:**
-- Kolom cari: nama, alamat, nomor telepon (mengetik "0812" juga menemukan nomor yang tersimpan sebagai 62812), website, email, kategori, dan wilayah
-- Priority: HIGH / MEDIUM / LOW
-- CRM Status: New / Contacted / Replied / Interested / Meeting / Won / Lost
-- **Provinsi, Kabupaten/Kota, dan Kecamatan**: dihitung dari koordinat tiap lead (alamat Google Maps jarang menyebut kota). Tombol **Klasifikasi wilayah N lead** menjalankannya di latar belakang; lead dari scrape baru diproses otomatis. Layanan gratis yang dipakai membatasi satu permintaan per detik, jadi ratusan lead butuh beberapa menit. Atur `GEOCODER_URL` ke Nominatim sendiri agar lebih cepat.
-- Tab **Daftar / Peta**: daftar dibagi per halaman ("Halaman 1 dari 17") dan peta menampilkan **semua** lead yang punya koordinat, bukan hanya halaman pertama.
+| Trường | Ví dụ | Ghi chú |
+|--------|-------|---------|
+| Tên chiến dịch | "Cho thuê máy ảnh Quý 4 2026" | Tên để nhận biết |
+| Loại hình doanh nghiệp mục tiêu | cho thuê máy ảnh | **Loại hình doanh nghiệp bạn muốn tìm**, không phải ngành của chính bạn. Văn bản tự do; không có danh sách cố định vì danh mục Google Maps rất đa dạng. |
+| Địa điểm | một thành phố | Thành phố hoặc khu vực mục tiêu. Nhiều khu vực ngăn cách bằng dấu phẩy, dấu chấm phẩy, `/`, `&`, `+`, "dan" hoặc xuống dòng. Thành phố bạn gõ được tìm đúng ở thành phố đó (kết quả cách trung tâm hơn khoảng 50 km bị loại). Gõ **Seluruh Indonesia** để chạy một lượt tìm cho mỗi thành phố của Indonesia, bắt đầu từ thành phố lớn nhất. |
+| Từ khóa tìm kiếm | "thuê máy ảnh" | Như bạn gõ trên Google Maps. Có thể nhiều từ khóa. |
+| Dịch vụ / sản phẩm của bạn | "Phần mềm quản lý cho thuê dành cho cửa hàng cho thuê máy ảnh" | Điều bạn cung cấp cho các khách hàng tiềm năng này |
+| Số kết quả tối đa | 20 | Số khách hàng tiềm năng mục tiêu (10 đến 1.500 trên biểu mẫu; API nhận đến 2.000). Với mục tiêu lớn, dùng "Seluruh Indonesia" và nhiều từ khóa. Chiến dịch dừng ngay khi đạt mục tiêu. |
+| Phong cách nội dung | Cân bằng | Chuyên nghiệp / Thân thiện / Cân bằng / Thoải mái |
+| Ngôn ngữ | Tiếng Việt | Ngôn ngữ của bản nháp tin nhắn (xem bên dưới) |
 
-### Prioritas leads
+Bấm **Bắt đầu chiến dịch**: hệ thống bắt đầu tìm trên Google Maps và chấm điểm kết quả ngay.
 
-Skor (0–100) adalah **indeks urutan**, bukan prediksi penjualan. Ia membantu memilih siapa yang dihubungi lebih dulu.
+> **Giới hạn hiện tại về thị trường.** Phần tìm kiếm Google Maps (ngôn ngữ trình duyệt, danh sách thành phố và khu vực, mã quốc gia điện thoại mặc định `62`) vẫn được điều chỉnh cho thị trường Indonesia và chưa được kiểm thử riêng cho Việt Nam. Hỗ trợ tiếng Việt hiện chỉ áp dụng cho giao diện và cho văn bản AI soạn; Prospex chưa tự tìm khách hàng tiềm năng tại Việt Nam một cách đã được kiểm chứng.
 
-| Skor | Prioritas | Artinya |
-|------|-----------|---------|
-| 70–100 | HIGH | Hubungi lebih dulu |
-| 50–69 | MEDIUM | Masuk urutan standar |
-| 0–49 | LOW | Hubungi kalau kapasitas ada |
+### Ngôn ngữ soạn tin
 
-### Dari mana skor berasal
+Trường **Ngôn ngữ** của chiến dịch quyết định ngôn ngữ AI dùng cho mọi thứ của chiến dịch đó: tin nhắn đầu tiên, tin liên hệ lại, bản nháp trả lời, tiêu đề và chân thư email. Hai lựa chọn là **Tiếng Việt** (mặc định) và **Tiếng Anh** (trong giao diện tiếng Anh: Vietnamese và English).
 
-Hanya dari data nyata hasil scraping, ditambah satu penilaian AI. Tidak ada bobot industri atau kota yang ditulis tangan.
+- Mặc định là tiếng Việt. Khi biểu mẫu được điền từ brief đã lưu, trường này lấy ngôn ngữ của brief; bạn luôn có thể đổi lại trước khi bắt đầu.
+- Chiến dịch cũ lưu `indonesian` được hiểu là **tiếng Anh**; chiến dịch không bị sửa, bạn chỉ cần tạo chiến dịch mới để soạn bằng tiếng Việt.
+- Khách hàng có thể trả lời bằng bất kỳ ngôn ngữ nào: lời từ chối nhận tin và ý định của câu trả lời được hiểu bằng tiếng Việt, tiếng Anh và tiếng Indonesia.
 
-| Sinyal | Poin |
-|--------|------|
-| Dasar | 30 |
-| Punya nomor telepon (bisa dihubungi) | +15 |
-| Punya alamat | +3 |
-| Rating (rata-rata Bayesian: rating dengan sedikit ulasan ditarik ke 4,0, sehingga 5,0 dari 1 ulasan tidak mengalahkan 4,5 dari ribuan ulasan) | +5 / +10 / +15 untuk 3,5 / 4,0 / 4,5 |
-| Jumlah ulasan | +2 / +5 / +10 untuk 5 / 20 / 100 ulasan |
-| **Kecocokan dengan penawaran Anda** (penilaian AI dari nama dan kategori Google Maps asli bisnis itu, terhadap penawaran dan brief Anda) | +20 tinggi, +8 sedang, −15 rendah, 0 bila tidak dinilai |
+### Mẹo chọn từ khóa
 
-Alasan penilaian kecocokan ditampilkan di detail lead. Nama ikut dinilai: bisnis bernama "Rental Kamera X" dianggap relevan untuk sistem sewa walau kategori Maps-nya hanya "Toko Kamera". Penilaian ini butuh penyedia AI; model lokal kecil bisa keliru, karena itu alasannya selalu ditampilkan. Lead tanpa nomor telepon diberi catatan karena tidak bisa dihubungi lewat WhatsApp.
+- Gọi tên loại hình kinh doanh như cách Google Maps ghi: `"cửa hàng điện thoại"`, `"phòng khám nha khoa"`, `"cho thuê xe"`.
+- Đừng dùng tên dịch vụ của chính bạn (`"dịch vụ thiết kế website"`) hay chức danh (`"giám đốc vận hành"`): đó là những đơn vị cùng làm dịch vụ hoặc là con người, không phải doanh nghiệp được tìm trên Maps. Prospex loại những mục như vậy khỏi gợi ý của AI.
+- Thêm vài từ khóa để phủ rộng hơn.
+- Cụ thể về vị trí: `"salon làm đẹp quận 1"` tốt hơn `"salon"`.
 
-Kategori yang tampil di tiap lead adalah **kategori asli dari Google Maps** (bahasanya mengikuti bahasa antarmuka Maps).
+### Điều kiện thu thập dữ liệu
 
--------|----------|---------|
-| 75–100 | HIGH | Segera hubungi — potensi tinggi |
-| 55–74 | MEDIUM | Masuk sequence standar |
-| 0–54 | LOW | Hubungi kalau kapasitas ada |
-
-### Faktor yang mempengaruhi skor
-
-- Kelengkapan data (nomor HP, website, alamat)
-- Rating Google Maps (4.5+ = bonus besar)
-- Industri target (cafe, tech, healthcare = skor lebih tinggi)
-- Lokasi (Jakarta, Bali = bonus)
-- Tidak punya website = peluang digital (bonus kecil)
+Việc thu thập dữ liệu dùng trình duyệt Chromium trên máy chủ. Cài một lần bằng `pnpm --filter @prospex/api exec playwright install chromium`. Nếu thiếu trình duyệt hoặc lượt tìm thất bại, chiến dịch có trạng thái **Thất bại** kèm thông báo rõ ràng. Prospex không bao giờ lấp danh sách khách hàng tiềm năng bằng những doanh nghiệp bịa ra.
 
 ---
 
-## 6. Brief Pemasaran
+## 4. Theo dõi tiến trình thu thập dữ liệu
 
-Menu **Brief pemasaran** menampilkan apa yang Prospex ketahui tentang produk Anda: apa yang dijual, untuk siapa, apa pembedanya, dan apa buktinya. Brief ini ditulis AI **dari sumber Anda sendiri** (bagian 3) dan dibaca oleh setiap kampanye dan draf.
+Sau khi tạo chiến dịch, trang chi tiết chiến dịch hiển thị tiến trình theo thời gian thực.
 
-### Isi brief
+### Trạng thái chiến dịch
 
-Ringkasan (untuk mengisi kampanye), gambaran umum, audiens, masalah, pembeda, sudut pendekatan outreach per jenis bisnis (hipotesis untuk diuji, bukan fakta), keberatan yang mungkin muncul, bukti (angka, pelanggan, testimoni), penawaran (harga, ajakan bertindak), dan suara merek.
+| Trạng thái | Màu | Ý nghĩa |
+|------------|-----|---------|
+| Bản nháp | Xám | Chưa bắt đầu |
+| Đang chạy | Xanh dương, có vòng quay | Đang thu thập dữ liệu và chấm điểm |
+| Hoàn tất | Xanh lá | Xong, đã có khách hàng tiềm năng |
+| Thất bại | Đỏ | Thất bại. Nguyên nhân được hiển thị (ví dụ chưa cài trình duyệt); xem thêm log của API |
 
-### Aturan agar tidak mengarang
+### Thanh tiến trình
 
-- Fakta hanya dari sumber. Angka, nama pelanggan, testimoni, dan harga yang tidak ditemukan di sumber **dibuang** dan dicatat di kotak kuning **Informasi yang kurang**.
-- Yang tidak bisa ditentukan dikosongkan, bukan ditebak. Isian kosong ditampilkan sebagai "Tidak ditemukan di sumber".
-- Halaman ini menampilkan **halaman apa saja yang dibaca AI** (bagian bawah), sehingga Anda bisa menilai dasar brief.
+Tiến trình tự cập nhật mỗi 2 giây:
 
-### Mengedit dan membuat ulang
-
-- Klik **Edit bagian** untuk mengubah semua bagian (daftar: satu butir per baris), lalu **Simpan perubahan**. Setiap simpan menaikkan nomor versi.
-- Klik **Buat ulang** setelah menambah sumber atau catatan. Ini menggantikan brief sebelumnya.
-- Model AI bisa salah menaruh isi (mis. harga di kolom lain). Brief adalah titik awal yang harus Anda periksa, terutama bagian bukti dan penawaran.
-
-### Di mana brief dipakai
-
-- **Form kampanye**: mengisi nama, jenis bisnis target, kata kunci, deskripsi, gaya, dan bahasa.
-- **Skor lead**: dasar penilaian kecocokan.
-- **Draf pesan**: sudut yang cocok dengan jenis bisnis lead, bukti yang boleh disebut (hanya yang ada di brief), dan kata yang dihindari.
-- Sumber yang ditambahkan juga masuk basis pengetahuan, sehingga draf balasan bisa mengutip fakta Anda.
-
-Detail teknis dan batas: [marketing-brief.md](marketing-brief.md) (bahasa Inggris).
+- **0–30%**: khởi tạo và thu thập dữ liệu
+- **30–60%**: chấm điểm tất cả khách hàng tiềm năng
+- **60–95%**: đánh giá mức độ phù hợp của từng doanh nghiệp với ưu đãi của bạn (cần nhà cung cấp AI) và chuẩn bị ghi chú email và gọi điện cho khách hàng tiềm năng ưu tiên **Cao**
+- **100%**: hoàn tất
 
 ---
 
-## 7. Gaya AI: pesan dengan suara Anda
+## 5. Quản lý khách hàng tiềm năng
 
-Fitur ini opsional, tapi membuat draf terdengar seperti Anda, bukan seperti asisten AI. Buka menu **Gaya AI**.
+### Trang Khách hàng tiềm năng
 
-### Cara mengekspor chat
+Vào **Khách hàng tiềm năng** ở thanh bên để xem tất cả khách hàng tiềm năng của mọi chiến dịch.
 
-Di WhatsApp: buka sebuah chat, lalu **Lainnya → Ekspor chat → Tanpa media**. Hasilnya file `.txt` (atau `.zip`). Ulangi untuk beberapa percakapan, terutama dengan pelanggan. Makin banyak percakapan, makin akurat.
+**Bộ lọc có sẵn:**
 
-### Langkah di Prospex
+- Ô tìm kiếm: tên, địa chỉ, số điện thoại (gõ "0812" cũng tìm ra số được lưu dạng 62812), website, email, danh mục và khu vực
+- **Ưu tiên**: Cao / Trung bình / Thấp
+- **Trạng thái CRM**: Mới / Đã liên hệ / Đã trả lời / Quan tâm / Hẹn gặp / Đề xuất / Thắng / Thua
+- **Tỉnh / thành phố, Quận / huyện và Phường / xã**: được tính từ tọa độ của từng khách hàng tiềm năng (địa chỉ Google Maps hiếm khi nêu thành phố). Nút **Xác định khu vực của N khách hàng tiềm năng** chạy việc này ngầm; khách hàng tiềm năng từ lần thu thập mới được xử lý tự động. Dịch vụ miễn phí được dùng giới hạn một yêu cầu mỗi giây, nên hàng trăm khách hàng tiềm năng cần vài phút. Đặt `GEOCODER_URL` trỏ tới Nominatim của riêng bạn để nhanh hơn.
+- Hai tab **Danh sách / Bản đồ**: danh sách chia trang ("Trang 1/17") và bản đồ hiển thị **tất cả** khách hàng tiềm năng có tọa độ, không chỉ trang đầu.
 
-1. Letakkan file ekspor di kotak unggah, lalu klik **Baca file**.
-2. Pilih nama Anda dari daftar pengirim (yang paling banyak menulis sudah terpilih).
-3. Klik **Pelajari gaya saya**. Dengan model lokal (Ollama) ini bisa memakan beberapa menit.
-4. Coba di kotak **Coba satu pesan**: tempel pesan pelanggan dan lihat draf serta jejaknya (kebiasaan yang dipakai, contoh balasan Anda yang mirip, fakta yang ditemukan).
+### Mức ưu tiên
 
-### Apa yang disimpan
+Điểm (0–100) là **chỉ số thứ tự**, không phải dự đoán doanh số. Nó giúp chọn nên liên hệ ai trước.
 
-Statistik cara menulis Anda dan pasangan "pesan pelanggan → balasan Anda" yang sudah dianonimkan (nomor, email, dan tautan diganti). **Chat asli tidak disimpan.** Tombol **Hapus** menghapus semuanya. Detail dan hasil uji ada di [ai-style.md](ai-style.md) (bahasa Inggris).
+| Điểm | Ưu tiên | Ý nghĩa |
+|------|---------|---------|
+| 70–100 | Cao | Liên hệ trước |
+| 50–69 | Trung bình | Vào thứ tự thông thường |
+| 0–49 | Thấp | Liên hệ khi còn khả năng |
 
-Butuh minimal 30 pesan Anda sendiri. Kalau Anda mengganti model embedding di pengaturan server, impor ulang chat Anda.
+### Điểm đến từ đâu
 
-### Draf WhatsApp dan pesan lain
+Chỉ từ dữ liệu thật của lần thu thập, cộng một đánh giá của AI. Không có trọng số ngành hay thành phố nào được viết tay.
 
-Pesan WhatsApp tidak lagi dibuat otomatis saat scraping. Draf dibuat dari menu **Kotak Keluar** (bagian 8), memakai data nyata lead (rating, jumlah ulasan, belum punya website), gaya Anda, dan basis pengetahuan Anda. Di halaman detail lead tetap ada catatan email, LinkedIn, dan telepon yang dibuat AI untuk lead prioritas HIGH, kalau penyedia AI sudah diatur. Tanpa penyedia AI, Prospex tidak menampilkan teks bawaan.
+| Tín hiệu | Điểm |
+|----------|------|
+| Cơ sở | 30 |
+| Có số điện thoại (liên hệ được) | +15 |
+| Có địa chỉ | +3 |
+| Đánh giá (trung bình Bayes: đánh giá có ít lượt nhận xét bị kéo về 4,0, nên 5,0 từ 1 nhận xét không thắng 4,5 từ hàng nghìn nhận xét) | +5 / +10 / +15 cho 3,5 / 4,0 / 4,5 |
+| Số lượt đánh giá | +2 / +5 / +10 cho 5 / 20 / 100 lượt |
+| **Độ phù hợp với ưu đãi của bạn** (AI đánh giá từ tên và danh mục Google Maps thật của doanh nghiệp, so với ưu đãi và brief của bạn) | +20 cao, +8 trung bình, −15 thấp, 0 nếu không được đánh giá |
 
----
+Lý do đánh giá độ phù hợp hiển thị ở trang chi tiết khách hàng tiềm năng. Tên cũng được xét: doanh nghiệp tên "Cho thuê máy ảnh X" được coi là phù hợp với hệ thống cho thuê dù danh mục Maps chỉ là "Cửa hàng máy ảnh". Việc đánh giá này cần nhà cung cấp AI; mô hình cục bộ nhỏ có thể sai, vì vậy lý do luôn được hiển thị. Khách hàng tiềm năng không có số điện thoại được ghi chú vì không liên hệ được qua WhatsApp.
 
-## 8. Kotak Keluar dan WhatsApp
-
-Menu **Kotak Keluar** adalah tempat semua pesan keluar. Prinsipnya: **setiap pesan berawal sebagai draf dan tidak terkirim sebelum Anda setujui.**
-
-### Hubungkan WhatsApp
-
-1. Klik **Hubungkan WhatsApp**. Kode QR muncul.
-2. Di ponsel: WhatsApp → **Pengaturan → Perangkat tertaut → Tautkan perangkat**, lalu pindai.
-3. Status berubah menjadi "Terhubung sebagai +62…".
-
-Gunakan **nomor khusus bisnis**. Koneksi perangkat tertaut tidak resmi, dan WhatsApp bisa membatasi nomor yang dianggap otomatis. Prospex menurunkan risikonya, tapi tidak bisa menghilangkannya.
-
-### Membuat dan meninjau draf
-
-1. Tab **Tinjau** → pilih kampanye dan jumlah (maksimal 200) → **Buat draf**. Penulisan berjalan di latar belakang, jadi Anda boleh meninggalkan halaman. Model lokal butuh sekitar 40 detik per draf.
-2. Untuk setiap draf: **Setujui**, **Sunting** (ubah teksnya dulu), atau **Tolak**. Tombol **Setujui semua** meminta konfirmasi dulu.
-3. Draf yang bertanda kuning perlu dibaca teliti: memuat tautan, harga, diskon, atau teks yang terbaca seperti perintah untuk AI.
-4. Yang disetujui pindah ke tab **Antrean** dan dikirim satu per satu. Anda masih bisa mengeluarkannya dari antrean.
-
-Lead yang nomornya tidak valid, sudah pernah dihubungi, atau sudah berhenti dilewati otomatis. Setiap pesan pertama dan tindak lanjut diakhiri baris "balas STOP".
-
-Pesan WhatsApp pertama tidak dibatasi jumlah karakternya; yang penting setiap kalimat berguna. Kalimat pertama menyebut siapa Anda dan apa yang ditawarkan dengan kata sehari-hari. Kalau yang Anda tawarkan **jasa** (misalnya agensi yang membuat sistem sesuai pesanan), pesan memperkenalkan perusahaan, menyebut cakupan layanannya dengan nama yang awam, lalu mengajak berdiskusi; tidak menawarkan "contoh tampilan" atau demo yang belum ada. Kalau yang Anda tawarkan **produk jadi**, pesan boleh menawarkan contoh atau demo. Dalam uji nyata, pesan yang langsung membuka dengan pertanyaan tanpa perkenalan dikira pelanggan yang mau menyewa. Baca setiap draf; model kecil kadang menafsirkan rating atau memakai kalimat kaku (draf seperti itu ditandai kuning).
-
-### Format, lampiran, dan preview tautan
-
-- **Format WhatsApp** dipertahankan: `*tebal*`, `_miring_`, `~coret~`, daftar dengan `- `, dan baris kosong antarparagraf. Outbox menampilkan setiap pesan sebagai gelembung WhatsApp: file atau kartu tautan di atas, teks di bawahnya, dan baris "balas STOP" sebagai catatan kecil.
-- **Lampiran**: saat menyunting draf (atau di panel "Satu pesan untuk banyak lead") pilih **Unggah file**: PDF, JPG, PNG, WebP, MP4, DOCX, XLSX, atau PPTX, maksimal 16 MB. Jenis file dibaca dari isinya, bukan dari namanya. Teks pesan menjadi keterangan file; bila lebih dari 1.024 karakter (batas WhatsApp), teks dikirim sebagai pesan terpisah tepat setelah file. File yang masih dipakai pesan yang menunggu tidak bisa dihapus. Email belum mendukung lampiran.
-- **Preview tautan**: tautan di dalam pesan otomatis mendapat kartu (judul, deskripsi, gambar) yang Anda lihat sebelum menyetujui. Matikan dengan kotak centang bila tidak mau. Halaman yang tidak bisa dibaca dikirim tanpa kartu.
-
-### Satu pesan untuk banyak lead
-
-Kalau hasil draf per lead mengecewakan dan Anda ingin satu pesan yang Anda atur sendiri untuk satu jenis bisnis (misalnya semua rental kebaya):
-
-1. Di tab **Tinjau**, buka kartu **Satu pesan untuk banyak lead**.
-2. **Pilih lead**: pilih *Jenis bisnis* (kategori Google Maps; angka di sampingnya = bisa dihubungi/total), atau cari nama (mis. "kebaya"). Lead yang tanpa kontak atau sudah dikirimi ditandai dan tidak bisa dipilih. Pakai **Pilih semua yang bisa dihubungi**.
-3. **Tulis pesannya** sendiri, atau tekan **Tulis dengan AI untuk jenis bisnis ini** (satu kali panggilan AI untuk satu templat, bukan per lead), lalu sunting sesuka Anda. `{nama}` diganti nama bisnis tiap lead dan `{kategori}` jenisnya. Untuk email, isi juga subjek.
-4. Tekan **Buat N draf**. Setiap lead mendapat drafnya sendiri di daftar Tinjau (WhatsApp otomatis diberi kalimat "balas STOP", email diberi footer). Anda tetap menyetujui seperti biasa; tidak ada yang terkirim sebelum itu.
-
-Karena semua penerima mendapat teks yang sama, pakai `{nama}`, kirim per kelompok kecil, dan sebar beberapa hari supaya nomor tetap aman.
-
-### Kecepatan pengiriman
-
-Klik **Batas** untuk mengatur:
-
-| Pengaturan | Bawaan | Catatan |
-|-----------|--------|---------|
-| Pesan per jam | 10 | 1 sampai 30. Makin rendah makin aman. |
-| Pesan per hari | 80 | 1 sampai 200 |
-| Jam tenang | 21:00 sampai 07:00 | Pesan menunggu sampai jam tenang selesai |
-| Zona waktu | Asia/Jakarta | |
-| Kode negara bawaan | 62 | Dipakai untuk nomor yang ditulis tanpa kode negara |
-
-Jeda antar pesan diacak (0,6 sampai 1,4 kali rata-rata), dan "mengetik…" ditampilkan dulu sebelum tiap pesan terkirim. Dengan pengaturan bawaan, daftar 1.500 lead selesai sekitar **19 hari**. Menaikkan batas harian ke 140 mempercepatnya menjadi sekitar 11 hari. Pada 20 per jam dan 200 per hari, 1.000 lead selesai sekitar 5 hari. Pada 20 per jam satu pesan keluar kira-kira setiap tiga menit; antrean yang panjang memang lambat dengan sengaja. Mulailah dengan 30 sampai 50 lead, lihat berapa yang membalas dan apakah nomor tetap sehat, baru naikkan.
-
-Prospex otomatis menjeda pengiriman setelah 3 kegagalan berturut-turut. Tombol **Jeda pengiriman** juga ada kalau Anda ingin berhenti sendiri.
-
-### Balasan dan tindak lanjut
-
-- **Lead membalas**: Prospex memahami maksudnya (tertarik, minta bertemu, tanya harga, pertanyaan, belum sekarang, tidak tertarik), memajukan statusnya (tidak pernah memundurkan), menandainya "menunggu jawaban Anda", membatalkan tindak lanjut yang tertunda, dan membuat **draf balasan** di tab Tinjau dengan pesan pelanggan dikutip di atasnya. Draf balasan ditulis sopan dan rendah hati (Anda pihak yang menawarkan): tanpa emoji, tanpa perintah, tanpa menebak sapaan. Anda tetap yang menyetujui, dan balasan yang disetujui **langsung dikirim, mendahului antrean pesan pertama** dan tidak terkena batas per jam.
-- **Prospex membaca seluruh percakapan**: gelembung yang ditulis berdekatan (selisih paling lama 3 menit) dijawab sebagai satu pesan, sapaan otomatis toko dan chat lama hanya menjadi riwayat, keterangan foto dan kartu kontak ikut terbaca. Draf ditulis sekitar 20 detik setelah gelembung terakhir, **menggantikan draf lama** yang masih menunggu, dan tidak dibuat kalau Anda sudah menjawab.
-- **Anda membalas dari ponsel sendiri**: pesan itu dicatat (hanya untuk nomor yang ada di daftar lead; chat pribadi lain diabaikan dan tidak disimpan), lead tidak lagi "menunggu jawaban Anda", draf yang basi ditarik, dan draf berikutnya tahu apa yang sudah Anda katakan. Pesan ini tidak dihitung ke batas kirim per jam dan per hari.
-- **Dialihkan ke kontak lain** ("silakan hubungi management kami", atau mereka membagikan kartu kontak): balasannya ucapan terima kasih yang tetap (atau permintaan nomor), nomornya disimpan di riwayat aktivitas lead, dan tombol **Tambahkan sebagai lead** membuatnya sebagai lead sendiri, satu kali saja untuk nomor yang sama.
-- **Sapaan otomatis toko** ("Terima kasih telah menghubungi…", "mohon menunggu", jam buka, menu panjang) dikenali dan hanya dicatat: status tidak berubah dan tidak dibuatkan draf.
-- **Pelanggan menulis STOP** (atau "berhenti", "unsubscribe", dan sejenisnya, termasuk di dalam kalimat pendek seperti "Maaf kak belum ya STOP"): nomornya diblokir permanen, semua pesan yang menunggu dibatalkan, dan lead ditutup sebagai Gagal dengan alasan "Meminta berhenti (STOP)".
-- **Lead diam**: Prospex membuat draf tindak lanjut setelah 3 hari, dan satu lagi 5 hari kemudian. Maksimal dua. Tombol **Cek tindak lanjut** menjalankannya sekarang.
-- Pesan dari nomor yang tidak dikenal disimpan tapi tidak dijawab. WhatsApp kadang menyembunyikan nomor pengirim; pesan itu tampil di halaman **Pipeline** di kartu "Pesan dari pengirim tak dikenal" dan tidak bisa dicocokkan dengan lead, jadi kalau isinya STOP, keluarkan bisnis itu dari daftar Anda secara manual.
-
-### Tab "Perlu perhatian"
-
-Berisi pesan yang gagal, misalnya "Number is not on WhatsApp" (nomor itu tidak bisa dihubungi) atau kegagalan kirim. **Coba lagi** muncul untuk yang layak dicoba ulang. Pesan yang terputus saat server restart ditandai gagal dan **tidak dikirim ulang otomatis**, karena mungkin sudah terkirim. Cek WhatsApp dulu.
-
-Penjelasan teknis lengkap: [whatsapp-outbox.md](whatsapp-outbox.md) (bahasa Inggris).
+Danh mục hiển thị ở mỗi khách hàng tiềm năng là **danh mục gốc của Google Maps** (ngôn ngữ theo ngôn ngữ giao diện của Maps).
 
 ---
 
-### Kirim lewat email
+## 6. Brief marketing
 
-Di Kotak Keluar, pilih **Email** di atas daftar pesan. Alurnya sama dengan WhatsApp: AI menulis draf dan subjek, Anda meninjau, mengubah, lalu menyetujui. Tidak ada yang terkirim tanpa persetujuan.
+Menu **Brief marketing** hiển thị những gì Prospex biết về sản phẩm của bạn: bán gì, bán cho ai, điểm khác biệt và bằng chứng. Brief này do AI viết **từ chính các nguồn của bạn** ([mục 3](#3-tạo-chiến-dịch)) và được mọi chiến dịch và bản nháp đọc.
 
-1. Tekan **Atur email** dan isi akun SMTP Anda (server, port, nama pengguna, sandi, alamat pengirim) serta **alamat surat** Anda. Alamat itu dicetak di bawah setiap email, dan banyak negara mewajibkannya. Banyak penyedia memerlukan *sandi aplikasi*, bukan sandi biasa.
-2. Tekan **Uji koneksi**. Ini hanya login, tidak mengirim apa pun.
-3. Tekan **Tulis draf**. Lead yang dapat diemail adalah yang alamatnya ditemukan di website mereka (lihat "Cari kontak" di halaman campaign dan lead).
-4. Tinjau, setujui, dan email keluar satu per satu dengan jeda dan jam tenang.
+### Nội dung brief
 
-Setiap email memuat tautan berhenti berlangganan. Orang yang berhenti tidak akan dikirimi lagi. Agar tautan itu bisa dibuka penerima, isi `PUBLIC_API_URL` di server dengan alamat https publik (mis. `https://api.contoh.com/api`). **Selama belum diisi, pengiriman email dihentikan dan persetujuan draf email ditolak**, dengan peringatan merah di panel Email. Email berformat: "Halo,", paragraf pendek, ajakan, "Salam,". Di panel Email Anda bisa mengisi **Tautan di email pertama** (opsional); sistem menambahkannya sebagai satu baris "Selengkapnya: …" sebelum "Salam,". Balasan masuk ke kotak masuk email Anda sendiri; Prospex belum membacanya. Atur SPF, DKIM dan DMARC pada domain pengirim, dan mulai dengan jumlah kecil. Rincian dan batasan: [email-channel.md](email-channel.md).
+Tóm tắt (để điền chiến dịch), **Tổng quan**, **Đối tượng**, **Vấn đề**, **Điều làm nên khác biệt**, **Hướng tiếp cận** theo từng loại hình doanh nghiệp (giả thuyết cần thử, không phải sự thật), **Những phản đối có thể gặp**, **Bằng chứng** (con số, khách hàng, lời chứng thực), **Ưu đãi** (giá, lời kêu gọi hành động) và **Giọng thương hiệu**.
 
-## 9. CRM Pipeline
+### Quy tắc để không bịa
 
-### Halaman Pipeline: pantau sampai closing
+- Sự thật chỉ từ các nguồn. Con số, tên khách hàng, lời chứng thực và giá không tìm thấy trong nguồn bị **loại bỏ** và ghi vào hộp vàng **Thông tin còn thiếu**.
+- Điều không xác định được thì để trống, không đoán. Ô trống hiển thị "Không tìm thấy trong các nguồn".
+- Trang này hiển thị **các trang AI đã đọc** (ở cuối trang) để bạn đánh giá cơ sở của brief.
+- Brief được viết bằng ngôn ngữ bạn chọn (tiếng Việt hoặc tiếng Anh, theo nút EN | VI đang bật lúc tạo). Nguồn có thể bằng bất kỳ ngôn ngữ nào. Brief tiếng Việt thiếu dấu bị từ chối và ghi thành một mục thiếu thay vì được hiển thị.
 
-Menu **Pipeline** menunjukkan seluruh perjalanan lead:
+### Chỉnh sửa và tạo lại
 
-- **Empat angka**: tingkat balasan, tingkat menang, nilai deal berjalan, nilai deal menang. Tingkat balasan hanya menghitung balasan manusia, bukan sapaan otomatis toko.
-- **Tahap** dari Baru sampai Berhasil atau Gagal, dengan jumlah dan nilai deal.
-- **Menunggu jawaban Anda**: lead yang membalas dan belum Anda tangani, dengan maksudnya (mis. "Menanyakan harga"). **Waktunya follow-up**: tanggal yang Anda atau sistem tetapkan sudah lewat. **Sepi**: dihubungi lebih dari 7 hari tanpa balasan.
-- **Per kampanye**: jumlah lead, dihubungi, membalas, menang. **Alasan deal gagal**: dihitung dari kolom alasan.
-- **Pesan dari pengirim tak dikenal** (bila ada).
-- **Menunggu mereka**: lead yang sudah membalas (tahap Membalas sampai Proposal) dan **Anda yang terakhir menjawab**, tetapi sudah lebih dari 3 hari tidak ada balasan. Hanya pengingat untuk Anda; tidak ada draf otomatis, karena lead seperti ini sedang dalam proses (misalnya diminta mengisi formulir) dan bukan prospek dingin.
-- **Baca ulang percakapan**: tombol di bagian atas halaman membaca ulang setiap percakapan secara utuh (termasuk balasan Anda dari ponsel). Pertama muncul **pratinjau**: berapa percakapan akan berubah, berapa yang sudah Anda balas, label baru, tahap yang naik, dan draf usang yang ditarik. Tidak ada yang berubah sampai Anda menekan **Terapkan**. Pratinjau juga menunjukkan dua hal yang paling penting: **lead yang hanya mengirim sapaan otomatis toko** (dikembalikan ke "Sudah dihubungi", karena itu bukan balasan) dan **nomor yang sudah meminta berhenti tetapi belum diblokir** (akan diblokir dan ditutup sebagai Gagal). Label yang sudah spesifik tidak pernah ditimpa "other". Tahap yang diberi otomatis dan ternyata tidak pernah tercapai (misalnya "Meeting" karena kata "jadwal") diturunkan, sedangkan tahap yang Anda pilih sendiri tidak pernah diturunkan. Percakapan yang berlanjut dengan jawaban Anda yang tidak terekam (diketik dari ponsel sebelum fitur perekaman ada) dibiarkan apa adanya dan dilaporkan sebagai "tidak lengkap". Di kartu "Menunggu jawaban Anda", tombol **Sudah saya jawab** di tiap baris menandai lead yang sudah Anda balas dari ponsel. Ucapan sopan ("Ok kk", "makasih ka") tidak dihitung menunggu jawaban. Hasilnya: lead yang sudah Anda balas tidak lagi menunggu, label sesuai isi percakapan, tahap hanya maju, dan draf untuk pesan yang sudah terlewati diganti draf baru bila masih ada yang perlu dijawab.
+- Bấm **Chỉnh sửa các phần** để sửa mọi phần (danh sách: mỗi dòng một mục), rồi **Lưu thay đổi**. Mỗi lần lưu tăng số phiên bản.
+- Bấm **Tạo lại** sau khi thêm nguồn hoặc ghi chú. Việc này thay thế brief trước đó.
+- Mô hình AI có thể đặt nhầm nội dung (ví dụ giá vào trường khác). Brief là điểm khởi đầu bạn cần kiểm tra, nhất là phần bằng chứng và ưu đãi.
 
-Di halaman detail lead, selain status ada **Nilai deal**, **Follow-up pada**, **Kenapa gagal?** (muncul saat status Gagal), dan tombol **Tandai balasan sudah ditangani**. Deal tidak pernah ditutup otomatis, kecuali permintaan berhenti (STOP) yang ditutup sebagai Gagal.
+### Brief được dùng ở đâu
 
-### Update status lead
+- **Biểu mẫu chiến dịch**: điền tên, loại hình doanh nghiệp mục tiêu, từ khóa, mô tả, phong cách và ngôn ngữ.
+- **Điểm khách hàng tiềm năng**: cơ sở của việc đánh giá độ phù hợp.
+- **Bản nháp tin nhắn**: hướng tiếp cận hợp với loại hình doanh nghiệp, bằng chứng được phép nhắc (chỉ những gì có trong brief) và những từ cần tránh.
+- Nguồn được thêm cũng vào cơ sở kiến thức, nên bản nháp trả lời có thể trích dẫn sự thật của bạn.
 
-Di halaman detail lead, panel **CRM Status** di kanan:
+Chi tiết kỹ thuật và giới hạn: [marketing-brief.md](marketing-brief.md) (tiếng Anh).
 
-1. Pilih status baru dari dropdown
-2. Klik **Update Status**
+---
 
-Status otomatis mencatat timestamp (misal: `contactedAt`, `repliedAt`, `closedAt`).
+## 7. Phong cách AI: tin nhắn mang giọng văn của bạn
 
-### Alur CRM yang disarankan
+Tính năng này không bắt buộc, nhưng làm bản nháp nghe giống bạn hơn là giống một trợ lý AI. Mở menu **Phong cách AI**.
+
+### Cách xuất chat
+
+Trong WhatsApp: mở một cuộc trò chuyện, chọn **Thêm → Xuất chat → Không kèm phương tiện**. Kết quả là tệp `.txt` (hoặc `.zip`). Lặp lại với vài cuộc trò chuyện, nhất là với khách hàng. Càng nhiều cuộc trò chuyện càng chính xác.
+
+> Tệp xuất của WhatsApp tiếng Việt (ngày/tháng, đồng hồ SA/CH, chú thích tiếng Việt cho tin nhắn đã xóa hoặc thiếu phương tiện) đã được hỗ trợ nhưng mới thử với dữ liệu mẫu tự dựng, chưa thử với tệp xuất thật. Nếu một tệp bị đọc sai, hãy báo qua issue.
+
+### Các bước trong Prospex
+
+1. Thả các tệp `.txt` hoặc `.zip` vào khung tải lên, rồi bấm **Đọc tệp**.
+2. Chọn tên của bạn trong danh sách người gửi (người viết nhiều nhất đã được chọn sẵn; câu hỏi "Người nào là bạn?").
+3. Bấm **Học phong cách của tôi**. Với mô hình cục bộ (Ollama) việc này có thể mất vài phút.
+4. Thử ở khung **Thử một tin nhắn**: dán nội dung khách hàng đã viết rồi bấm **Soạn câu trả lời** để xem bản nháp và căn cứ tạo ra nó (thói quen đã áp dụng, các câu trả lời thật của bạn trong tình huống tương tự, thông tin đã tìm thấy). Bản nháp xem thử dùng ngôn ngữ của giao diện đang bật.
+
+### Hệ thống lưu gì
+
+Số liệu thống kê về cách bạn viết và các cặp "tin nhắn của khách → câu trả lời của bạn" đã được ẩn danh (số điện thoại, email và liên kết bị thay thế). **Chat gốc không được lưu.** Nút **Xóa** xóa tất cả. Chi tiết và kết quả thử nghiệm nằm ở [ai-style.md](ai-style.md) (tiếng Anh).
+
+Cần tối thiểu 30 tin nhắn của chính bạn. Nếu bạn đổi mô hình embedding trong cấu hình máy chủ, hãy nhập lại các chat.
+
+### Bản nháp WhatsApp và các ghi chú khác
+
+Tin nhắn WhatsApp không còn được tạo tự động khi thu thập dữ liệu. Bản nháp được soạn từ menu **Outbox** ([mục 8](#8-outbox-và-whatsapp)), dùng dữ liệu thật của khách hàng tiềm năng (đánh giá, số lượt đánh giá, chưa có website), phong cách của bạn và cơ sở kiến thức của bạn. Ở trang chi tiết khách hàng tiềm năng vẫn có ghi chú email, LinkedIn và gọi điện do AI viết cho khách hàng tiềm năng ưu tiên Cao, nếu đã cấu hình nhà cung cấp AI. Khi chưa có nhà cung cấp AI, Prospex không hiển thị văn bản có sẵn.
+
+---
+
+## 8. Outbox và WhatsApp
+
+Menu **Outbox** là nơi chứa mọi tin nhắn gửi đi. Nguyên tắc: **mọi tin nhắn bắt đầu là bản nháp và không được gửi cho đến khi bạn duyệt.**
+
+### Kết nối WhatsApp
+
+1. Bấm **Kết nối WhatsApp**. Mã QR hiện ra.
+2. Trên điện thoại: WhatsApp → **Cài đặt → Thiết bị đã liên kết → Liên kết thiết bị**, rồi quét mã.
+3. Trạng thái chuyển thành "Đã kết nối: +…".
+
+Hãy dùng **một số điện thoại riêng cho công việc**. Kết nối thiết bị liên kết là không chính thức, và WhatsApp có thể hạn chế số bị coi là tự động. Prospex giảm rủi ro nhưng không thể loại bỏ hoàn toàn.
+
+### Soạn và xem bản nháp
+
+1. Tab **Chờ duyệt** → chọn **Chiến dịch** và **Số lượng** (tối đa 200) → **Soạn bản nháp**. Việc soạn chạy ngầm nên bạn có thể rời trang. Mô hình cục bộ mất khoảng 40 giây cho mỗi bản nháp.
+2. Với mỗi bản nháp: **Duyệt**, **Chỉnh sửa** (sửa nội dung trước) hoặc **Từ chối**. Nút **Duyệt tất cả** yêu cầu xác nhận trước ("Xác nhận: duyệt N").
+3. Bản nháp có cảnh báo màu vàng cần đọc kỹ: có liên kết, giá, giảm giá hoặc nội dung giống như chỉ dẫn dành cho AI.
+4. Tin đã duyệt chuyển sang tab **Hàng đợi** và được gửi từng tin một. Bạn vẫn có thể gỡ tin khỏi hàng đợi (**Xóa khỏi hàng đợi**).
+
+Khách hàng tiềm năng có số không hợp lệ, đã từng được liên hệ hoặc đã từ chối nhận tin sẽ tự bị bỏ qua (thông báo "Đã bỏ qua: …"). Mỗi tin nhắn đầu tiên và tin liên hệ lại kết thúc bằng một dòng xin cho phép khách từ chối, bằng ngôn ngữ của chiến dịch:
+
+- Tiếng Việt: "Nếu anh/chị không muốn nhận tin nhắn, vui lòng trả lời STOP."
+- Tiếng Anh: "If you'd rather not hear from me, reply STOP."
+
+Từ **STOP** giữ nguyên ở cả hai ngôn ngữ.
+
+Tin WhatsApp đầu tiên không bị giới hạn số ký tự; điều quan trọng là mỗi câu đều có ích. Trong tiếng Việt, tin mở đầu bằng "Xin chào anh/chị," và người viết xưng "em". Câu đầu tiên nêu bạn là ai và bạn cung cấp gì bằng lời nói hằng ngày. Nếu bạn cung cấp **dịch vụ** (ví dụ một agency làm hệ thống theo yêu cầu), tin giới thiệu công ty, nêu phạm vi dịch vụ bằng tên gọi dễ hiểu, rồi mời trao đổi; không đề nghị "xem mẫu giao diện" hay demo chưa có. Nếu bạn cung cấp **sản phẩm hoàn chỉnh**, tin có thể đề nghị gửi ví dụ hoặc demo. Trong thử nghiệm thật, tin nhắn mở đầu ngay bằng câu hỏi mà không giới thiệu bị tưởng là khách muốn thuê. Hãy đọc từng bản nháp; mô hình nhỏ đôi khi diễn giải sai điểm đánh giá hoặc dùng câu cứng nhắc (bản nháp như vậy được đánh dấu màu vàng).
+
+### Định dạng, tệp đính kèm và xem trước liên kết
+
+- **Định dạng WhatsApp** được giữ nguyên: `*đậm*`, `_nghiêng_`, `~gạch ngang~`, danh sách bằng `- ` và dòng trống giữa các đoạn. Outbox hiển thị mỗi tin như bong bóng WhatsApp: tệp hoặc thẻ liên kết ở trên, nội dung ở dưới, và dòng "STOP" là ghi chú nhỏ.
+- **Tệp đính kèm**: khi chỉnh sửa bản nháp (hoặc trong bảng "Một tin nhắn cho nhiều khách hàng tiềm năng"), chọn **Tải tệp lên**: PDF, JPG, PNG, WebP, MP4, DOCX, XLSX hoặc PPTX, tối đa 16 MB. Loại tệp được đọc từ nội dung chứ không phải từ tên. Nội dung tin nhắn trở thành chú thích của tệp; nếu dài hơn 1.024 ký tự (giới hạn của WhatsApp), nội dung được gửi thành một tin riêng ngay sau tệp. Tệp còn được tin đang chờ dùng thì không xóa được. Email chưa hỗ trợ tệp đính kèm.
+- **Xem trước liên kết**: liên kết trong tin tự nhận một thẻ (tiêu đề, mô tả, hình) mà bạn thấy trước khi duyệt; có ô để tắt (**Hiện thẻ xem trước cho liên kết**). Trang không đọc được thì gửi không kèm thẻ.
+
+### Một tin nhắn cho nhiều khách hàng tiềm năng
+
+Khi bản nháp riêng cho từng khách chưa như ý và bạn muốn một tin do chính bạn viết cho một loại hình doanh nghiệp (ví dụ mọi cửa hàng cho thuê áo dài):
+
+1. Ở tab **Chờ duyệt**, mở thẻ **Một tin nhắn cho nhiều khách hàng tiềm năng** (nút **Mở**).
+2. **1. Chọn khách hàng tiềm năng**: chọn *Loại hình doanh nghiệp* (danh mục Google Maps; con số bên cạnh là số liên hệ được trên tổng số), hoặc tìm theo tên. Khách hàng tiềm năng không có liên hệ hoặc đã được nhắn được đánh dấu và không chọn được. Dùng **Chọn tất cả những ai liên hệ được**.
+3. **2. Nội dung tin nhắn**: tự viết, hoặc bấm **Viết bằng AI cho loại hình doanh nghiệp này** (một lần gọi AI cho một mẫu, không phải cho từng người), rồi chỉnh sửa thoải mái. `{nama}` được thay bằng tên doanh nghiệp của từng khách và `{kategori}` bằng loại hình của họ (hai ký hiệu này giữ nguyên tên như vậy trong mọi ngôn ngữ). Với email, điền cả **Tiêu đề**.
+4. **3. Tạo bản nháp**: bấm **Tạo N bản nháp**. Mỗi khách có bản nháp riêng ở danh sách **Chờ duyệt** (WhatsApp tự được thêm dòng STOP, email được thêm chân thư). Bạn vẫn duyệt như thường; không có gì được gửi trước đó.
+
+Vì mọi người nhận cùng một nội dung, hãy dùng `{nama}`, gửi theo từng nhóm nhỏ và dàn trải qua vài ngày để số điện thoại được an toàn.
+
+### Tốc độ gửi
+
+Bấm **Giới hạn** để cài đặt:
+
+| Cài đặt | Mặc định | Ghi chú |
+|---------|----------|---------|
+| Số tin mỗi giờ | 10 | 1 đến 30. Càng thấp càng an toàn. |
+| Số tin mỗi ngày | 80 | 1 đến 200 |
+| Không gửi từ (giờ) / Không gửi đến (giờ) | 21:00 đến 07:00 | Tin chờ cho đến hết giờ không gửi |
+| Múi giờ | Asia/Jakarta | Đổi sang múi giờ của bạn, ví dụ Asia/Ho_Chi_Minh |
+| Mã quốc gia mặc định | 62 | Dùng cho số viết không có mã quốc gia. Với số Việt Nam hãy đặt 84. |
+
+Khoảng nghỉ giữa các tin được làm ngẫu nhiên (0,6 đến 1,4 lần mức trung bình) và "đang soạn tin…" hiện trước mỗi tin được gửi. Với cài đặt mặc định, một danh sách 1.500 khách hàng tiềm năng xong sau khoảng **19 ngày**. Nâng giới hạn ngày lên 140 rút còn khoảng 11 ngày. Ở mức 20 tin mỗi giờ và 200 mỗi ngày, 1.000 khách hàng tiềm năng xong sau khoảng 5 ngày. Ở 20 tin mỗi giờ, cứ khoảng ba phút có một tin được gửi; hàng đợi dài chậm là có chủ ý. Hãy bắt đầu với 30 đến 50 khách hàng tiềm năng, xem bao nhiêu người trả lời và số điện thoại còn khỏe không, rồi mới tăng.
+
+Prospex tự tạm dừng gửi sau 3 lần thất bại liên tiếp. Nút **Tạm dừng gửi** cũng có sẵn khi bạn muốn tự dừng; **Tiếp tục gửi** để gửi lại.
+
+### Tin trả lời và liên hệ lại
+
+- **Khách hàng tiềm năng trả lời**: Prospex hiểu ý (quan tâm, muốn hẹn gặp, hỏi về giá, có câu hỏi, chưa phải lúc này, không quan tâm), đẩy trạng thái tiến lên (không bao giờ lùi), đánh dấu "Đang chờ bạn trả lời", hủy các lượt liên hệ lại đang chờ và tạo **bản nháp trả lời** ở tab **Chờ duyệt** kèm tin của khách được trích bên trên. Bản nháp trả lời viết lịch sự và khiêm nhường (bạn là bên chào bán): không emoji, không ra lệnh, không đoán cách xưng hô. Bạn vẫn là người duyệt, và tin trả lời đã duyệt **được gửi ngay, ưu tiên hơn hàng đợi tin đầu tiên** và không bị giới hạn theo giờ.
+- **Prospex đọc cả cuộc trò chuyện**: các bong bóng viết sát nhau (cách nhau tối đa 3 phút) được trả lời như một tin; lời chào tự động của cửa hàng và chat cũ chỉ là lịch sử; chú thích ảnh và thẻ liên hệ cũng được đọc. Bản nháp được soạn khoảng 20 giây sau bong bóng cuối, **thay thế bản nháp cũ** còn chờ, và không được tạo nếu bạn đã trả lời.
+- **Bạn trả lời từ chính điện thoại của mình**: tin đó được ghi lại (chỉ với số có trong danh sách khách hàng tiềm năng; các cuộc trò chuyện cá nhân khác bị bỏ qua và không được lưu), khách hàng tiềm năng không còn "đang chờ bạn trả lời", bản nháp lỗi thời được thu hồi và các bản nháp sau biết bạn đã nói gì. Các tin này không tính vào giới hạn gửi theo giờ và theo ngày.
+- **Được giới thiệu sang một liên hệ khác** ("hãy liên hệ bộ phận quản lý của bên mình", hoặc họ gửi thẻ liên hệ): câu trả lời là lời cảm ơn cố định (hoặc xin số), số được lưu vào nhật ký hoạt động của khách hàng tiềm năng, và nút **Thêm … làm khách hàng tiềm năng** tạo họ thành một khách hàng tiềm năng riêng, chỉ một lần cho cùng một số.
+- **Lời chào tự động của cửa hàng** ("Cảm ơn bạn đã liên hệ…", "vui lòng chờ trong giây lát", giờ mở cửa, menu dài; cũng nhận ra các câu tiếng Indonesia như "Terima kasih telah menghubungi…") được nhận ra và chỉ ghi lại: trạng thái không đổi và không tạo bản nháp.
+- **Khách hàng nhắn STOP**: các cách nói được nhận ra bằng tiếng Việt, tiếng Anh và tiếng Indonesia, kể cả trong câu ngắn. Ví dụ tiếng Việt: "dừng gửi", "đừng nhắn nữa", "ngừng làm phiền", "hủy đăng ký", "xóa số của tôi"; nếu khách gõ không dấu thì "dung gui", "ngung nhan tin" cũng được nhận ra. Số điện thoại bị chặn vĩnh viễn, mọi tin đang chờ bị hủy và khách hàng tiềm năng được đóng với trạng thái Thua, lý do "Dừng nhận tin (STOP)". Một câu xác nhận như "Đúng, gửi giúp em báo giá" **không** bị coi là từ chối. Một số cách nói mơ hồ ("đừng" đứng một mình, "thôi") cố ý không được tính, nên nếu ai đó từ chối theo cách khác hãy tự xử lý.
+- **Khách hàng tiềm năng im lặng**: Prospex soạn bản nháp liên hệ lại sau 3 ngày và thêm một bản nữa sau 5 ngày. Tối đa hai bản. Nút **Kiểm tra tin liên hệ lại** chạy việc này ngay.
+- Tin từ số không quen được lưu nhưng không được trả lời. WhatsApp đôi khi ẩn số người gửi; tin đó hiện ở trang **Pipeline**, thẻ "Tin nhắn từ người gửi không xác định", và không khớp được với khách hàng tiềm năng nào, nên nếu nội dung là STOP, hãy tự loại doanh nghiệp đó khỏi danh sách của bạn.
+
+> Tin do khách gửi kèm ảnh hay thẻ liên hệ được lưu với nhãn viết theo kiểu tiếng Indonesia, ví dụ `[Gambar]` hoặc `[Kontak: …]`, và được hiển thị đúng như đã lưu, cả khi bạn dùng giao diện tiếng Việt.
+
+### Tab "Cần chú ý"
+
+Chứa các tin thất bại, ví dụ "Number is not on WhatsApp" (số đó không liên hệ được) hoặc gửi lỗi. Nút **Thử lại** hiện với tin đáng thử lại. Tin bị gián đoạn khi máy chủ khởi động lại được đánh dấu thất bại và **không tự gửi lại**, vì có thể đã được gửi rồi. Hãy kiểm tra WhatsApp trước.
+
+Giải thích kỹ thuật đầy đủ: [whatsapp-outbox.md](whatsapp-outbox.md) (tiếng Anh).
+
+---
+
+### Gửi qua email
+
+Trong Outbox, chọn **Email** ở phía trên danh sách tin. Quy trình giống WhatsApp: AI viết bản nháp và tiêu đề, bạn xem lại, chỉnh sửa rồi duyệt. Không có gì được gửi nếu chưa duyệt.
+
+1. Bấm **Thiết lập email** và điền tài khoản SMTP của bạn (**Máy chủ thư**, **Cổng**, **Tên đăng nhập**, **Mật khẩu**, **Địa chỉ người gửi**) cùng **Địa chỉ bưu chính của người gửi**. Địa chỉ này được in ở cuối mỗi email, và nhiều quốc gia yêu cầu điều đó. Nhiều nhà cung cấp cần *mật khẩu ứng dụng*, không phải mật khẩu thường.
+2. Bấm **Kiểm tra kết nối**. Việc này chỉ đăng nhập, không gửi gì.
+3. Bấm **Soạn bản nháp**. Khách hàng tiềm năng gửi email được là những người có địa chỉ tìm thấy trên website của họ (xem **Tìm thông tin liên hệ** ở trang chiến dịch và trang khách hàng tiềm năng).
+4. Xem lại, duyệt, và email được gửi từng thư một có quãng nghỉ và giờ không gửi tin.
+
+Mỗi email có một liên kết hủy đăng ký. Người đã hủy sẽ không được gửi nữa. Để người nhận mở được liên kết đó, hãy đặt `PUBLIC_API_URL` trên máy chủ thành một địa chỉ https công khai (ví dụ `https://api.example.com/api`). **Khi chưa đặt, việc gửi email bị dừng và việc duyệt bản nháp email bị từ chối**, kèm cảnh báo đỏ ở bảng Email. Liên kết mở ra một trang xác nhận bằng tiếng Việt kèm tiếng Anh; chỉ khi bấm nút **Hủy đăng ký** thì việc hủy mới được ghi nhận.
+
+Email có dạng: lời chào ("Kính gửi Quý khách," trong tiếng Việt, "Hi," trong tiếng Anh), các đoạn ngắn, một lời mời, và lời kết ("Trân trọng," hoặc "Best regards,"). Dòng hủy đăng ký ở chân thư cũng theo ngôn ngữ của chiến dịch. Ở bảng Email bạn có thể điền **Liên kết trong email đầu tiên (không bắt buộc)**; hệ thống thêm nó thành một dòng "Xem thêm: …" (tiếng Anh: "More details: …") trước lời kết. Thư trả lời về hộp thư của chính bạn; Prospex chưa đọc chúng. Hãy cấu hình SPF, DKIM và DMARC cho tên miền gửi, và bắt đầu với số lượng nhỏ. Chi tiết và giới hạn: [email-channel.md](email-channel.md).
+
+## 9. Pipeline CRM
+
+### Trang Pipeline: theo dõi đến khi chốt
+
+Menu **Pipeline** cho thấy toàn bộ hành trình của khách hàng tiềm năng:
+
+- **Bốn con số**: **Tỷ lệ trả lời**, **Tỷ lệ thắng**, **Thương vụ đang mở** (giá trị), giá trị thương vụ **Thắng**. Tỷ lệ trả lời chỉ tính câu trả lời của người thật, không tính lời chào tự động của cửa hàng.
+- **Các giai đoạn** từ Mới đến Thắng hoặc Thua, kèm số lượng và giá trị thương vụ.
+- **Đang chờ bạn trả lời**: khách hàng tiềm năng đã trả lời và bạn chưa xử lý, kèm ý định của họ (ví dụ "Hỏi về giá"). **Đến hạn liên hệ lại**: ngày do bạn hoặc hệ thống đặt đã qua. **Đã im lặng (không trả lời sau 7 ngày)**: đã liên hệ hơn 7 ngày mà không có trả lời.
+- **Theo chiến dịch**: số khách hàng tiềm năng, đã liên hệ, đã trả lời, thắng. **Lý do thua thương vụ**: tính từ cột lý do.
+- **Tin nhắn từ người gửi không xác định** (nếu có).
+- **Đang chờ họ**: khách hàng tiềm năng đã trả lời (từ giai đoạn Đã trả lời đến Đề xuất) và **bạn là người trả lời sau cùng**, nhưng đã hơn 3 ngày không có phản hồi. Đây chỉ là lời nhắc cho bạn; không có bản nháp tự động, vì những khách như vậy đang trong quá trình (ví dụ được nhờ điền biểu mẫu), không phải khách hàng tiềm năng lạnh.
+- **Đọc lại các cuộc trò chuyện**: nút ở đầu trang đọc lại từng cuộc trò chuyện một cách đầy đủ (kể cả những tin bạn trả lời từ điện thoại). Trước hết xuất hiện **bản xem trước**: bao nhiêu cuộc sẽ thay đổi, bao nhiêu cuộc bạn đã trả lời, nhãn mới, giai đoạn được đẩy lên và bản nháp lỗi thời được thu hồi. Không có gì thay đổi cho đến khi bạn bấm **Áp dụng**. Bản xem trước cũng chỉ ra hai điều quan trọng nhất: **khách hàng tiềm năng chỉ gửi lời chào tự động của cửa hàng** (được đưa về "Đã liên hệ", vì đó không phải là trả lời) và **số đã yêu cầu dừng nhưng chưa bị chặn** (sẽ bị chặn và đóng với trạng thái Thua). Nhãn đã cụ thể không bao giờ bị ghi đè bằng "other". Giai đoạn do hệ thống tự gán nhưng hóa ra chưa từng đạt (ví dụ "Hẹn gặp" vì có chữ "lịch") được hạ xuống, còn giai đoạn do bạn tự chọn thì không bao giờ bị hạ. Cuộc trò chuyện tiếp tục bằng những câu trả lời của bạn chưa được ghi lại (nhắn từ điện thoại trước khi có tính năng ghi nhận) được giữ nguyên và báo là "chưa đầy đủ". Ở thẻ "Đang chờ bạn trả lời", nút **Tôi đã trả lời** trên mỗi dòng đánh dấu khách hàng tiềm năng mà bạn đã nhắn lại từ điện thoại. Lời kết lịch sự (ví dụ "ok", "cảm ơn") không được tính là đang chờ trả lời. Kết quả: khách hàng tiềm năng bạn đã trả lời không còn ở trạng thái chờ, nhãn khớp với nội dung cuộc trò chuyện, giai đoạn chỉ tiến lên, và bản nháp cho tin đã qua được thay bằng bản nháp mới nếu vẫn còn điều cần trả lời.
+
+Ở trang chi tiết khách hàng tiềm năng, ngoài trạng thái còn có **Giá trị thương vụ**, **Liên hệ lại vào**, **Vì sao thua?** (xuất hiện khi trạng thái là Thua) và nút **Đánh dấu đã xử lý tin trả lời**, cùng nút **Lưu thông tin thương vụ**. Thương vụ không bao giờ được đóng tự động, trừ yêu cầu dừng (STOP) được đóng với trạng thái Thua.
+
+### Cập nhật trạng thái khách hàng tiềm năng
+
+Ở trang chi tiết khách hàng tiềm năng, bảng **Trạng thái CRM** bên phải:
+
+1. Chọn trạng thái mới trong danh sách thả xuống
+2. Bấm **Cập nhật trạng thái**
+
+Trạng thái tự ghi lại thời điểm (ví dụ `contactedAt`, `repliedAt`, `closedAt`).
+
+### Quy trình CRM đề xuất
 
 ```
-New → Contacted → Replied → Interested → Meeting → Proposal → Won
-                                                 ↘ Lost
+Mới → Đã liên hệ → Đã trả lời → Quan tâm → Hẹn gặp → Đề xuất → Thắng
+                                                     ↘ Thua
 ```
 
-| Status | Kapan digunakan |
-|--------|----------------|
-| **New** | Baru ditemukan, belum dihubungi |
-| **Contacted** | Sudah kirim pesan/email pertama |
-| **Replied** | Prospek sudah reply/response |
-| **Interested (Tertarik)** | Menyetujui tawaran Anda (mis. "boleh" atas tawaran contoh) atau meminta contoh/info. Naik otomatis dari balasan, tidak pernah mundur |
-| **Meeting** | Sudah jadwal meeting/demo |
-| **Proposal** | Sudah kirim penawaran |
-| **Won** | Deal closed, jadi customer |
-| **Lost** | Tidak jadi, tolak, atau tidak respon |
+| Trạng thái | Khi nào dùng |
+|------------|--------------|
+| **Mới** | Vừa tìm thấy, chưa liên hệ |
+| **Đã liên hệ** | Đã gửi tin nhắn/email đầu tiên |
+| **Đã trả lời** | Khách hàng tiềm năng đã phản hồi |
+| **Quan tâm** | Đồng ý với lời đề nghị của bạn (ví dụ "được" khi bạn đề nghị gửi mẫu) hoặc xin ví dụ/thông tin. Tự động tăng từ tin trả lời, không bao giờ lùi |
+| **Hẹn gặp** | Đã hẹn họp/demo |
+| **Đề xuất** | Đã gửi báo giá |
+| **Thắng** | Chốt thương vụ, trở thành khách hàng |
+| **Thua** | Không thành, bị từ chối hoặc không phản hồi |
 
-### Activity Log
+### Nhật ký hoạt động
 
-Setiap perubahan status otomatis tercatat di **Activity Log** di panel kanan lead detail. Ini membantu tracking history komunikasi.
-
----
-
-## 10. Analytics
-
-Masuk ke **Analytics** di sidebar.
-
-### Metrics utama
-
-- **Total Leads** — seluruh leads dari semua campaign
-- **Conversion Rate** — persentase leads yang jadi Won
-- **Deals Won** — jumlah deal berhasil ditutup
-- **Active Campaigns** — campaign yang running atau completed
-
-### Chart
-
-**Leads by Industry** — bar chart jumlah leads + average score per industri. Berguna untuk tahu industri mana paling banyak leads berkualitas.
-
-**CRM Funnel** — pie chart distribusi leads di setiap stage pipeline. Kalau banyak di "Contacted" tapi sedikit "Replied", artinya pesan kurang engaging.
+Mỗi thay đổi trạng thái được tự ghi vào **Nhật ký hoạt động** ở bảng bên phải của trang chi tiết khách hàng tiềm năng. Nhật ký giúp theo dõi lịch sử liên lạc.
 
 ---
 
-## 11. Export Leads
+## 10. Phân tích
 
-### Dari Campaign Detail
+Vào **Phân tích** ở thanh bên.
 
-Di halaman `/campaigns/:id`, ada 3 tombol export:
+### Chỉ số chính
 
-| Format | Kegunaan |
-|--------|----------|
-| **CSV** | Import ke Excel, Google Sheets, CRM lain |
-| **JSON** | Integrasi ke aplikasi / automation (Zapier, n8n) |
-| **vCard** | Import langsung ke kontak HP / Outlook |
+- **Tổng khách hàng tiềm năng**: tất cả khách hàng tiềm năng của mọi chiến dịch
+- **Tỷ lệ chuyển đổi**: phần trăm khách hàng tiềm năng trở thành Thắng
+- **Thương vụ thắng**: số thương vụ đã chốt thành công
+- **Chiến dịch đang chạy**: chiến dịch đang chạy hoặc đã hoàn tất
 
-### Dari Leads List
+### Biểu đồ
 
-Di halaman `/leads`, tombol **Export CSV** di pojok kanan atas mengexport semua leads.
+**Khách hàng tiềm năng theo ngành**: biểu đồ cột số khách hàng tiềm năng kèm điểm trung bình theo ngành. Hữu ích để biết ngành nào có nhiều khách hàng tiềm năng chất lượng nhất.
 
-### Format vCard
+**Phễu CRM**: biểu đồ tròn phân bố khách hàng tiềm năng ở từng giai đoạn của pipeline. Nếu nhiều người ở "Đã liên hệ" nhưng ít người ở "Đã trả lời", nghĩa là tin nhắn chưa đủ hấp dẫn.
 
-File `.vcf` bisa langsung dibuka di HP untuk save kontak:
-- Nama bisnis
-- Nomor telepon
-- Alamat lengkap
+---
+
+## 11. Xuất danh sách khách hàng tiềm năng
+
+### Từ trang chi tiết chiến dịch
+
+Ở trang `/campaigns/:id` có 3 nút xuất:
+
+| Định dạng | Công dụng |
+|-----------|-----------|
+| **CSV** | Nhập vào Excel, Google Sheets, CRM khác |
+| **JSON** | Tích hợp vào ứng dụng / tự động hóa (Zapier, n8n) |
+| **vCard** | Nhập thẳng vào danh bạ điện thoại / Outlook |
+
+### Từ danh sách khách hàng tiềm năng
+
+Ở trang `/leads`, nút **Xuất CSV** ở góc trên bên phải xuất toàn bộ khách hàng tiềm năng.
+
+### Định dạng vCard
+
+Tệp `.vcf` mở thẳng được trên điện thoại để lưu danh bạ:
+
+- Tên doanh nghiệp
+- Số điện thoại
+- Địa chỉ đầy đủ
 - Website
-- AI Score + Priority (di field Notes)
+- Điểm AI và mức ưu tiên (ở trường Ghi chú)
 
 ---
 
-## 12. Settings & API Keys
+## 12. Cài đặt và khóa API
 
-### AI Configuration
+### Cấu hình AI
 
-**Settings → AI Configuration** — kunci, model chat, model embedding, dan base URL untuk workspace yang sedang aktif. Disimpan terenkripsi di database, berlaku tanpa restart, dan kunci tidak pernah ditampilkan lagi setelah disimpan (kosongkan kolomnya untuk tetap memakai kunci yang ada). Tombol **Uji koneksi** membuat satu panggilan chat dan satu panggilan embedding dengan pengaturan yang benar-benar dipakai. Bila model embedding diganti, sumber pengetahuan perlu **Indeks ulang** dan AI Style perlu diimpor ulang.
+**Cài đặt** → tab **AI và khóa API** → **Cấu hình AI**: khóa, mô hình chat, mô hình embedding và URL gốc cho không gian làm việc đang hoạt động. Được lưu mã hóa trong cơ sở dữ liệu, có hiệu lực ngay không cần khởi động lại, và khóa không bao giờ hiển thị lại sau khi lưu (để trống ô để giữ khóa hiện có). Nút **Kiểm tra kết nối** thực hiện một lần gọi chat và một lần gọi embedding với đúng cấu hình đang dùng. Khi đổi mô hình embedding, các nguồn kiến thức cần **Lập chỉ mục lại ngay** và Phong cách AI cần nhập lại.
 
-### Beberapa bisnis (workspace)
+### Nhiều doanh nghiệp (không gian làm việc)
 
-Satu login bisa memegang banyak bisnis. Klik nama workspace di kiri atas, pilih bisnis lain, atau **Workspace baru**. Tiap workspace punya brief pemasaran, AI Style, knowledge base, nomor WhatsApp, akun email, kunci AI, kampanye, lead, dan kunci API sendiri; tidak ada yang tercampur.
+Một tài khoản đăng nhập có thể quản lý nhiều doanh nghiệp. Bấm tên không gian làm việc ở góc trên bên trái, chọn doanh nghiệp khác, hoặc **Không gian làm việc mới**. Mỗi không gian làm việc có brief marketing, Phong cách AI, cơ sở kiến thức, số WhatsApp, tài khoản email, khóa AI, chiến dịch, khách hàng tiềm năng và khóa API riêng; không có gì bị lẫn.
 
-### Prospex API Keys
+### Khóa API Prospex
 
-Untuk mengakses Prospex API dari tools eksternal (Zapier, n8n, custom scripts):
+Để truy cập API của Prospex từ công cụ bên ngoài (Zapier, n8n, script riêng):
 
-1. Settings → **Prospex API Keys**
-2. Isi nama key (misal: "Zapier", "Production")
-3. Klik **+**
-4. **Salin key yang muncul sekarang** — tidak akan ditampilkan lagi
-5. Gunakan sebagai Bearer token: `Authorization: Bearer px_...`
+1. **Cài đặt** → **Khóa API Prospex**
+2. Điền tên khóa (ví dụ: "Zapier", "Production")
+3. Bấm **Tạo khóa API**
+4. **Sao chép khóa vừa hiện ngay bây giờ**: nó sẽ không hiển thị lại
+5. Dùng làm Bearer token: `Authorization: Bearer px_...`
 
-### Hapus API Key
+> Với API, trường `language` của chiến dịch, brief, mẫu tin và bản nháp xem thử chỉ nhận `vietnamese` hoặc `english`; `indonesian` trả về lỗi 400 (xem "Upgrade notes" trong [README](../README.md#language)).
 
-Klik ikon trash di sebelah kanan key yang ingin dihapus. Key langsung non-aktif.
+### Xóa khóa API
+
+Bấm biểu tượng thùng rác (**Xóa khóa API**) bên phải khóa muốn xóa. Khóa ngừng hoạt động ngay.
 
 ---
 
-## 13. Troubleshooting
+## 13. Khắc phục sự cố
 
-### API tidak bisa connect (frontend error)
+### API không kết nối được (lỗi ở giao diện)
 
 ```
 Error: Failed to fetch http://localhost:3001/api/...
 ```
 
-Pastikan API sudah jalan:
+Hãy kiểm tra API đã chạy:
 ```bash
 pnpm --filter @prospex/api dev
-# Harus lihat: "Prospex API running on http://localhost:3001"
+# Phải thấy: "Prospex API running on http://localhost:3001"
 ```
 
-### Database error saat start API
+### Lỗi cơ sở dữ liệu khi khởi động API
 
 ```
 Error: Can't reach database server at localhost:5432
 ```
 
-Pastikan Docker berjalan:
+Hãy kiểm tra Docker đang chạy:
 ```bash
 docker compose up -d
-docker ps   # harus ada prospex_db dan prospex_redis
+docker ps   # phải có prospex_db và prospex_redis
 ```
 
-### Campaign stuck di "running"
+### Chiến dịch kẹt ở "Đang chạy"
 
-Refresh halaman — kalau masih running padahal sudah lama, restart API:
+Tải lại trang. Nếu vẫn "Đang chạy" dù đã rất lâu, khởi động lại API:
 ```bash
-# Ctrl+C di terminal API, lalu:
+# Ctrl+C trong terminal của API, rồi:
 pnpm --filter @prospex/api dev
 ```
 
-### "Failed to fetch" saat analisis AI atau ada error 500 dari Ollama
+### "Failed to fetch" khi phân tích bằng AI hoặc lỗi 500 từ Ollama
 
-- Analisis kini berjalan di latar belakang; kalau muncul "Failed to fetch", biasanya API sempat restart (mode `--watch` me-restart API tiap ada perubahan kode). Tunggu beberapa detik dan jalankan lagi. Halaman yang dibuka ulang melanjutkan analisis yang masih berjalan.
-- Ollama hanya melayani satu permintaan sekaligus. Jangan menjalankan analisis, pengindeksan, dan pembuatan draf bersamaan. Ukuran konteks 16.384 token cukup (prompt terbesar sekitar 7.000) dan jauh lebih ringan daripada 131.072; di aplikasi Ollama atur *Context length*.
-- Untuk kampanye berikutnya jangan analisis ulang: pakai **Isi dari brief tersimpan**.
+- Việc phân tích giờ chạy ngầm; nếu hiện "Failed to fetch", thường là API vừa khởi động lại (chế độ `--watch` khởi động lại API mỗi khi mã thay đổi). Hãy đợi vài giây và chạy lại. Trang được mở lại sẽ tiếp tục phân tích đang chạy.
+- Ollama chỉ phục vụ một yêu cầu một lúc. Đừng chạy phân tích, lập chỉ mục và soạn bản nháp cùng lúc. Ngữ cảnh 16.384 token là đủ (prompt lớn nhất khoảng 7.000) và nhẹ hơn nhiều so với 131.072; trong ứng dụng Ollama hãy đặt *Context length*.
+- Với chiến dịch tiếp theo đừng phân tích lại: dùng **Điền từ brief đã lưu của tôi (tức thì)**.
 
-### Email tidak terkirim padahal sudah disetujui
+### Email chưa gửi dù đã duyệt
 
-Panel Email menampilkan peringatan merah bila `PUBLIC_API_URL` belum berupa alamat https publik. Isi dengan alamat publik API lalu restart API. (`ALLOW_LOCAL_UNSUBSCRIBE=true` hanya untuk uji lokal ke kotak masuk Anda sendiri.)
+Bảng Email hiển thị cảnh báo đỏ nếu `PUBLIC_API_URL` chưa phải địa chỉ https công khai. Hãy điền địa chỉ công khai của API rồi khởi động lại API. (`ALLOW_LOCAL_UNSUBSCRIBE=true` chỉ dành cho thử cục bộ vào hộp thư của chính bạn.)
 
-### Prisma error setelah update schema
+### Lỗi Prisma sau khi cập nhật schema
 
 ```bash
 pnpm --filter @prospex/database db:deploy
 pnpm --filter @prospex/database exec prisma generate
 ```
 
-### Port 3000 atau 3001 sudah dipakai
+### Cổng 3000 hoặc 3001 đã được dùng
 
 ```bash
-# Cari proses yang pakai port
+# Tìm tiến trình đang dùng cổng
 lsof -i :3000
 lsof -i :3001
 
-# Kill prosesnya
+# Dừng tiến trình đó
 kill -9 <PID>
 ```
 
-### Campaign gagal dengan pesan tentang browser
+### Chiến dịch thất bại với thông báo về trình duyệt
 
-"The scraping browser is not installed on the server": jalankan `pnpm --filter @prospex/api exec playwright install chromium` di server API, lalu jalankan ulang campaign. Pesan lain berarti Google Maps gagal dimuat atau berubah; coba lagi nanti atau kurangi jumlah kata kunci. Prospex tidak akan mengisi hasil dengan bisnis karangan.
+"The scraping browser is not installed on the server": chạy `pnpm --filter @prospex/api exec playwright install chromium` trên máy chủ API, rồi chạy lại chiến dịch. Thông báo khác nghĩa là Google Maps không tải được hoặc đã thay đổi; hãy thử lại sau hoặc giảm số từ khóa. Prospex sẽ không lấp kết quả bằng doanh nghiệp bịa ra.
 
-### Situs tidak terbaca di Materi sumber
+### Website không đọc được ở Tài liệu nguồn
 
-- Pesan "that address is not allowed": alamat mengarah ke jaringan internal atau lokal. Hanya situs publik (port 80 dan 443) yang bisa dibaca.
-- Pesan "almost no text": situs memuat isinya dengan JavaScript. Prospex mencoba membukanya dengan browser; bila Chromium belum terpasang, pasang dulu, atau tempel teksnya.
-- Situs dengan login atau yang memblokir bot tidak bisa dibaca: tempel teks atau unggah dokumen.
-- PDF ditolak: mungkin hasil scan (tanpa teks), dilindungi kata sandi, atau lebih dari 60 halaman.
-- Analisis AI sangat lama atau gagal dengan model lokal: aktifkan `OPENAI_REASONING_EFFORT=none` untuk model yang berpikir (gemma4, qwen3) dan kecilkan `BRIEF_SOURCE_CHARS` bila konteks modelnya kecil.
+- Thông báo "that address is not allowed": địa chỉ trỏ tới mạng nội bộ hoặc cục bộ. Chỉ đọc được website công khai (cổng 80 và 443).
+- Thông báo "almost no text": website nạp nội dung bằng JavaScript. Prospex thử mở bằng trình duyệt; nếu chưa cài Chromium thì hãy cài, hoặc dán văn bản vào.
+- Website cần đăng nhập hoặc chặn bot thì không đọc được: hãy dán văn bản hoặc tải tài liệu lên.
+- PDF bị từ chối: có thể là bản quét (không có chữ), có mật khẩu, hoặc dài hơn 60 trang.
+- Phân tích AI rất lâu hoặc thất bại với mô hình cục bộ: bật `OPENAI_REASONING_EFFORT=none` cho các mô hình có bước suy nghĩ (gemma4, qwen3) và giảm `BRIEF_SOURCE_CHARS` nếu ngữ cảnh của mô hình nhỏ.
 
-### Kode QR WhatsApp tidak muncul atau terus "Menghubungkan…"
+### Mã QR WhatsApp không hiện hoặc cứ "Đang kết nối…"
 
-- Pastikan server bisa keluar ke internet (WhatsApp Web memakai WebSocket).
-- Klik **Putuskan**, lalu **Hubungkan WhatsApp** lagi. Kode berganti setiap beberapa detik; pindai yang terbaru.
-- Cek `WHATSAPP_DISABLED` di `.env`: nilai `true` mematikan WhatsApp.
-- Lihat log API untuk pesan `WhatsApp closed (code …)`. Setelah 8 percobaan sambung ulang, Prospex berhenti dan menampilkan galatnya di Kotak Keluar.
+- Hãy chắc máy chủ ra được Internet (WhatsApp Web dùng WebSocket).
+- Bấm **Ngắt kết nối**, rồi **Kết nối WhatsApp** lại. Mã đổi sau vài giây; hãy quét mã mới nhất.
+- Kiểm tra `WHATSAPP_DISABLED` trong `.env`: giá trị `true` tắt WhatsApp.
+- Xem log API để tìm thông báo `WhatsApp closed (code …)`. Sau 8 lần thử kết nối lại, Prospex dừng và hiển thị lỗi trong Outbox.
 
-### Pesan disetujui tapi tidak terkirim
+### Tin đã duyệt nhưng không được gửi
 
-Periksa berurutan: (1) status harus "Terhubung" dan pengiriman tidak dijeda, (2) apakah sedang jam tenang, (3) batas per jam atau per hari sudah tercapai (lihat meter "Jam ini" dan "Hari ini"), (4) jeda acak antar pesan belum lewat. Tab **Antrean** menunjukkan urutannya, dan panel WhatsApp menampilkan jam tenang serta meter batas jam ini dan hari ini.
+Kiểm tra lần lượt: (1) trạng thái phải là "Đã kết nối" và việc gửi không bị tạm dừng, (2) có đang trong giờ không gửi tin không, (3) đã chạm giới hạn theo giờ hoặc theo ngày chưa (xem các bộ đếm "Trong giờ này" và "Hôm nay"), (4) khoảng nghỉ ngẫu nhiên giữa các tin đã qua chưa. Tab **Hàng đợi** cho thấy thứ tự, và bảng WhatsApp hiển thị giờ không gửi tin cùng các bộ đếm của giờ này và hôm nay.
 
-### Harus scan QR lagi setiap deploy
+### Phải quét lại mã QR sau mỗi lần triển khai
 
-Sesi WhatsApp disimpan di `WA_AUTH_DIR`. Di produksi, direktori itu harus berada di volume persisten (`docker-compose.prod.yml` sudah memasang volume `wa_auth`).
+Phiên WhatsApp được lưu ở `WA_AUTH_DIR`. Trong môi trường production, thư mục đó phải nằm trên một volume bền vững (`docker-compose.prod.yml` đã gắn sẵn volume `wa_auth`).
 
-### Reset database (development)
+### Đặt lại cơ sở dữ liệu (development)
 
 ```bash
-pnpm --filter @prospex/database exec prisma migrate reset   # menghapus data dan menerapkan ulang semua migrasi
+pnpm --filter @prospex/database exec prisma migrate reset   # xóa dữ liệu và áp dụng lại mọi migration
 ```
 
 ---
 
-## Shortcut Berguna
+## Lối tắt hữu ích
 
-| Aksi | Cara |
-|------|------|
-| Campaign baru | `/campaigns/new` |
-| Lihat semua leads | `/leads` |
-| Swagger API docs | `http://localhost:3001/api/docs` |
-| Database browser | `pnpm --filter @prospex/database db:studio` |
-| Export semua leads | `GET http://localhost:3001/api/export/leads/csv` |
+| Thao tác | Cách làm |
+|----------|----------|
+| Chiến dịch mới | `/campaigns/new` |
+| Xem mọi khách hàng tiềm năng | `/leads` |
+| Tài liệu Swagger của API | `http://localhost:3001/api/docs` |
+| Trình duyệt cơ sở dữ liệu | `pnpm --filter @prospex/database db:studio` |
+| Xuất mọi khách hàng tiềm năng | `GET http://localhost:3001/api/export/leads/csv` |
 
 ---
 
-_Prospex — open-source AI GTM automation platform_
+_Prospex: nền tảng tự động hóa GTM bằng AI mã nguồn mở_

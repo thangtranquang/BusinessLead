@@ -88,8 +88,21 @@ docs: update quickstart in README
 2. Run `pnpm --filter @prospex/web exec tsc --noEmit` — zero TS errors
 3. Run `pnpm --filter @prospex/api test`, all tests must pass
 4. Test the happy path manually in the browser. If you touched sending or inbound handling, also run `apps/api/scripts/pipeline-check.ts` (see `docs/architecture.md`)
-5. Add new UI text to both `apps/web/src/lib/i18n/en.ts` and `id.ts`
-6. Update `docs/USER_GUIDE.md` (and `docs/whatsapp-outbox.md` for sending changes) if you changed user-facing behavior
+5. Add new UI text to the English dictionary and to the Vietnamese one (see [Translations and languages](#translations-and-languages))
+6. Update `docs/USER_GUIDE.md` (written in Vietnamese; quote the on-screen labels exactly as they appear in `vi.ts`) (and `docs/whatsapp-outbox.md` for sending changes) if you changed user-facing behavior
+
+## Translations and languages
+
+The interface has two languages, English and Vietnamese. The AI output has the same two (`vietnamese`, `english`), chosen per campaign.
+
+- **English is the source of truth.** Add every new string to `apps/web/src/lib/i18n/en.ts` (or the matching `features-<area>.en.ts`) first. The Vietnamese dictionaries (`vi.ts`, `features-<area>.vi.ts`) are typed `Record<keyof typeof <english>, string>`, so a missing key fails `tsc`. Vietnamese must define every key; do not leave English text in it (product names such as Prospex, WhatsApp, Outbox, Pipeline and CRM stay).
+- **Placeholders** such as `{n}` and `{name}` must be the same set in both languages; their position may change. Vietnamese has no plural form, so a `_plural` key carries the same wording as the singular one.
+- **Use the glossary.** [docs/i18n-vi-glossary.md](docs/i18n-vi-glossary.md) fixes one Vietnamese term per product concept (khách hàng tiềm năng, chiến dịch, bản nháp, duyệt, ...), the register (`bạn` in the interface, `anh/chị` for the customer in AI text), sentence case, and the words that must never stay in Indonesian. Follow it, and add new terms to it.
+- **Run the parity spec** after touching a dictionary: `npx playwright test tests/e2e/i18n-dictionaries.spec.ts`. It checks the key sets, the placeholders, empty values and leftover Indonesian words.
+- **Dates, numbers and relative times** go through `useFormat()` (`apps/web/src/lib/i18n/use-format.ts`), never a bare `toLocaleString()` or a hard-coded locale.
+- **Machine translation is not enough.** Vietnamese text that has not been read by a native speaker is listed as pending in the glossary; say so in your PR.
+- **Adding a language** (for example a third output language): add the value in `apps/api/src/common/language.ts`, then add a key to every `Record<OutputLanguage, ...>` table (the compiler lists them; see "Output language" in [docs/architecture.md](docs/architecture.md)), a prompt block in `OUTPUT_RULES`, opt-out phrases and reply-intent patterns (keep them linear and unit-tested with hostile input), a web dictionary pair and a `Lang` value. English prompts must stay byte-identical: `ai/prompt-snapshots.test.ts` fails if you change one without naming the reason.
+- **AI text in a new language must be checked in code**, not only prompted: add the language's checks next to the existing ones (`outreach-check.ts`, `ai/orthography.ts`, `messaging/reply-plan.ts`) and mark anything tested only with canned outputs as **Simulated** in [docs/features.md](docs/features.md).
 
 ## Pull Request Template
 

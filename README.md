@@ -33,7 +33,7 @@ If Prospex is useful to you, a star helps other people find it.
 | **Understand your offer** | Give Prospex a website, a document (PDF, DOCX, Markdown, text) or pasted text. It reads the whole site (sitemap, `llms.txt`, linked pages), writes a Marketing Brief from what it finds, and fills in your campaign form for you to correct. What the sources do not say is listed as missing, not invented. |
 | **Find** | Scrape Google Maps by business type and city with a headless browser, up to 2,000 leads per campaign. A typed city is searched where you asked (anchored on its coordinates, results outside about 50 km are dropped); "Seluruh Indonesia" becomes one search per city, biggest markets first, 40 or more results per search. Each lead carries the real Maps category, rating, review count, phone, website and coordinates. If scraping fails the campaign fails honestly: Prospex never makes up businesses. |
 | **Score** | A 0 to 100 ranking from signals in the listing (reachable by phone, rating weighted by review count, review volume) plus an AI judgement of how well the business fits your offer, with the reason shown. No hard-coded industry or city weights. |
-| **Draft** | The AI writes the first message from the lead's real data, your own style, the matching angle from your brief and your knowledge base. WhatsApp messages say who you are and what you offer in the first sentence, in plain words, then one relevant point and one easy question. Emails open with a greeting, end with "Salam," and can carry one link you set yourself. Three openings rotate across a campaign so you can compare reply rates. |
+| **Draft** | The AI writes the first message from the lead's real data, your own style, the matching angle from your brief and your knowledge base. WhatsApp messages say who you are and what you offer in the first sentence, in plain words, then one relevant point and one easy question. Emails open with a greeting, end with a closing line ("Trân trọng," in Vietnamese, "Best regards," in English) and can carry one link you set yourself. Each campaign writes in one output language, Vietnamese (the default) or English, see [Language](#language). Three openings rotate across a campaign so you can compare reply rates. |
 | **One message for many leads** | Prefer to write it once? In the Outbox, pick a kind of business (for example every kebaya rental), choose the leads, write the message or let the AI write one for that kind of business, and Prospex makes one draft per lead in the review list. `{nama}` and `{kategori}` fill in each lead's own name and category. No AI call per lead, so hundreds of drafts take a second. |
 | **Approve** | Read, edit, approve or reject each draft in the Outbox, shown as the WhatsApp bubble it will be (bold, italics, lists, the link card, the attached file). Attach a file or a link preview if you want one. Nothing is sent before this step. |
 | **Organise** | Every lead is reachable: paged lists, search by name, address, phone, website, email, category or area, province, city and district worked out from the coordinates, and a map that shows all leads. |
@@ -113,11 +113,40 @@ Pace decides the calendar. At the defaults (10 per hour, 80 per day) a list of 1
 
 **Two ways to connect WhatsApp.** Today Prospex connects as a linked device (Baileys), which works with any number but is unofficial, so use a dedicated business number. The official WhatsApp Business Cloud API is planned as a hosted-only feature (alatpintar.id subscribers), delivered as a separate private connector that is not built yet. The sender already talks to WhatsApp through one provider interface, and the Outbox settings show the option locked outside the hosted edition. See [docs/editions.md](docs/editions.md).
 
+<a id="language"></a>
+## Language
+
+Two separate things, both English or Vietnamese:
+
+- **The interface.** The `EN | VI` switch in the header and on the login page. The choice is kept in the `prospex_lang` cookie; a visitor with no cookie sees English.
+- **The language the AI writes in.** Chosen per campaign (*New campaign, Language*: Tiếng Việt or Tiếng Anh in the Vietnamese interface, Vietnamese or English in the English one). Vietnamese is the default. It covers first messages, follow-ups, replies, email subjects and footers, the Marketing Brief, lead fit reasons, templates and the AI Style preview. Customers can answer in any language: opt-out words and reply intent are understood in Vietnamese, English and Indonesian.
+
+Vietnamese text is checked in code (full diacritics, polite "anh/chị", no slang, question words, numbers such as "2.000.000đ" and "4,5 sao"), but it has only been tested with stand-in AI answers, not with a real model, and the Vietnamese wording has **not yet been reviewed by a native speaker**. Read every draft before you approve it, as always. Status per feature: [docs/features.md](docs/features.md). Glossary of terms: [docs/i18n-vi-glossary.md](docs/i18n-vi-glossary.md).
+
+### Upgrade notes (Indonesian to Vietnamese)
+
+Indonesian is no longer an interface or output language. If you upgrade an existing install:
+
+1. **API `language` values are now `vietnamese` or `english`.** `POST /api/campaigns`, `PATCH /api/campaigns/:id`, `POST /api/marketing/brief/generate`, `POST /api/messaging/templates/generate`, `POST /api/messaging/templates/apply` and `POST /api/style/draft` answer `400` to `"indonesian"`, to `null` and to anything else; leaving the field out is fine (default `vietnamese`). Clients that sent `"indonesian"` must change it.
+2. **Stored rows are not rewritten.** A campaign, brief or queued email that still says `indonesian` is read as English from now on (drafts, footers and the interface show English). Create a new campaign, or `PATCH` the language, to switch it. Old messages, replies and "lost reason" texts stay as they were written.
+3. **Run the migration.** `20261023000000_language_default_vietnamese` only changes the column default of `campaigns.language` and `marketing_briefs.language` to `vietnamese`; no data changes. Apply it with `pnpm --filter @prospex/database db:deploy` (production and CI), or `pnpm --filter @prospex/database db:push` in a development database. The reverse SQL is in the migration file.
+4. **Cookies.** An old `prospex_lang=id` cookie reads as English; the visitor picks VI once.
+5. Existing WhatsApp opt-out lines in already-sent messages (Indonesian "Kalau tidak berkenan, balas STOP.") are still recognised and stripped when conversations are read.
+
+### Known limitations of Vietnamese support
+
+- Native-speaker review is pending for the interface text, the opt-out line, the email footer, the unsubscribe pages, the canned replies and the AI prompt wording (the list is in [docs/i18n-vi-glossary.md](docs/i18n-vi-glossary.md)).
+- Vietnamese AI output and Vietnamese WhatsApp export parsing were tested with invented fixtures and fake AI clients only ("Simulated" in [docs/features.md](docs/features.md)).
+- The rest of the product is still tuned for the Indonesian market and was left out of this change: the default phone country code is `62`, the area lookup and the Google Maps scraper (Indonesian locale and `hl=id`, searches suffixed with ", Indonesia", city lists, "Seluruh Indonesia") are Indonesian, and billing amounts are shown with "Rp". Prospex does not yet discover Vietnamese-market leads on its own.
+- `message_opt_outs.reason` stores the first 200 characters of the customer's own opt-out message, as before.
+- WhatsApp attachments received from customers are stored with Indonesian-looking markers such as `[Gambar]` or `[Kontak: ...]` and shown as stored, also in the Vietnamese interface.
+- The screenshots in `docs/screenshots` still show the English interface.
+
 ## Tech stack
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | Next.js 16 (App Router), shadcn/ui, Tailwind CSS, Recharts, English and Indonesian interface |
+| **Frontend** | Next.js 16 (App Router), shadcn/ui, Tailwind CSS, Recharts, English and Vietnamese interface |
 | **Backend** | NestJS 10, Prisma ORM, REST API with Swagger |
 | **Database** | PostgreSQL 16 with pgvector |
 | **Queue** | BullMQ and Redis 7 for scraping jobs |
@@ -160,7 +189,7 @@ Your first outreach, step by step:
 3. **Outbox**: click **Connect WhatsApp** and scan the code with the phone (WhatsApp, Linked devices). Use a dedicated number.
 4. **Outbox, Review**: choose the campaign, click **Write drafts**, then approve what you like.
 
-The full walkthrough is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md) (Indonesian).
+The full walkthrough is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md) (Vietnamese).
 
 ### Choosing an AI provider
 
@@ -222,7 +251,7 @@ This starts PostgreSQL with pgvector, Redis, the API, the dashboard and Nginx. K
 prospex/
 ├── apps/
 │   ├── api/              # NestJS API: scraper, leads, ai, messaging, auth
-│   ├── web/              # Next.js dashboard (EN/ID)
+│   ├── web/              # Next.js dashboard (EN/VI)
 │   └── marketing/        # Landing page
 ├── packages/
 │   ├── database/         # Prisma schema and migrations
@@ -280,7 +309,7 @@ Done:
 - [x] AI Style: learn your voice from WhatsApp exports
 - [x] Outbox: approve, edit, reject, then send one at a time with limits
 - [x] WhatsApp through Baileys: pairing, replies as drafts, STOP handling, follow-up drafts
-- [x] English and Indonesian interface on every screen
+- [x] English and Vietnamese interface on every screen, and Vietnamese or English drafts per campaign
 - [x] Several businesses per login: separate brief, AI Style, knowledge, WhatsApp number and AI key for each workspace
 - [x] Leads you can always find again: paged lists, search by address, phone and area, province/city/district filters, a map with every lead
 - [x] WhatsApp messages with formatting, files and link previews

@@ -36,6 +36,10 @@ The brief follows the structure of the `product-marketing` skill:
 - **Outreach angles**: one per type of customer business, each with a likely pain, an opening hook and a benefit. These are **hypotheses to test**, not facts.
 - **Suggested campaign**: a name, the business type to look for, search queries, location, content style and language.
 
+## Language
+
+The brief is written in one output language, `vietnamese` (the default) or `english`, sent as `language` to `POST /api/marketing/brief/generate`. The web app sends the language of the interface at that moment (VI gives `vietnamese`, EN gives `english`). The instructions to the model are one English set plus a short Vietnamese block with the output rules; the language you ask for wins over whatever the model writes in its own "campaign language" field, and the same value is stored on the brief (`marketing_briefs.language`) and used to fill the campaign form's language. Anything else (`indonesian`, `null`, an unknown word) is rejected with 400 on that route; a brief stored by an older version with `indonesian` reads as English until you generate it again. The sources can be in any language. Vietnamese briefs are checked for diacritics (a brief without them is rejected as a gap, not shown), the gap notes written by the code follow the brief's language, and numbers are compared by their digits, so a source "2,000,000" supports a brief that says "2.000.000". Vietnamese brief output is **Simulated** (tested with canned model answers only) and its wording is not yet reviewed by a native speaker.
+
 ## How it avoids inventing
 
 1. **The prompt** tells the model to use only the sources and to list missing information as `[NEED: ...]`.

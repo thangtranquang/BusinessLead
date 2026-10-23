@@ -4,7 +4,7 @@ Drafts that sound like you instead of like an assistant. This page explains what
 
 ## What it learns from
 
-WhatsApp's own **Export chat** feature: open a chat, More, Export chat, Without media. You get a `.txt` file (or a `.zip` containing one). Upload several. Android and iOS formats, 12 and 24 hour clocks and multi-line messages are handled, and system lines and `<Media omitted>` placeholders are skipped.
+WhatsApp's own **Export chat** feature: open a chat, More, Export chat, Without media. You get a `.txt` file (or a `.zip` containing one). Upload several. Android and iOS formats, 12 and 24 hour clocks (including the Vietnamese SA and CH) and multi-line messages are handled, and system lines and `<Media omitted>` placeholders are skipped.
 
 You pick which participant is you. Your messages become the voice. The other person's messages are used only as the "question" in each question-and-answer pair.
 
@@ -19,19 +19,23 @@ Delete everything with the **Delete** button on the AI Style page. Because this 
 
 If you use a hosted AI provider, the question text of your pairs is sent to it to create vectors, and the drafts you request are written by it. To keep chats on your machine, use Ollama.
 
+## Languages
+
+The draft preview (`POST /api/style/draft`) takes a `language` field, `vietnamese` (the default) or `english`; the AI Style page sends the language of the interface. The stored statistics carry a rough language mix as `language: { vietnamese, english }`, computed from common function words; a profile saved by an older version (`{ indonesian, english }`) is still read and counts as no Vietnamese. Export parsing of Vietnamese chats (day/month dates, SA/CH clocks, Vietnamese placeholders for deleted, edited and missing media) is **Simulated**: it was built and tested from invented fixtures because no real Vietnamese export was available. Import a real Android and a real iOS export and report what is skipped or misread. To run the quality test in Vietnamese or English set `LANGUAGE` (default `vietnamese`) when you start `eval-style.ts`.
+
 ## How a draft is written
 
 1. **Habits.** Your measured statistics are described to the model ("replies of about 52 characters, emoji in 17% of messages, mostly capitalized openers").
 2. **Examples.** The five of your real replies whose questions are most similar to the situation are retrieved with pgvector and shown to the model as examples of tone.
 3. **Facts.** The knowledge base is searched. If nothing matches, the model is told not to state prices, schedules or policies.
-4. **Spelling.** The owner's chat habits (all lowercase, no final punctuation, "gk", "yg") are not imitated: only length, word choice, warmth and emoji follow your style. The example replies shown to the model are first put into standard spelling, and every finished draft is cleaned deterministically (PUEBI): capitals at sentence starts and for names, terminal punctuation, a comma before the vocative ("Halo, Kak, ..."), "Anda", decimal comma for ratings, and an opening "Selamat sore" replaced by "Halo" because a draft is read at an unknown hour.
+4. **Spelling.** The owner's chat habits (all lowercase, no final punctuation, "gk", "yg") are not imitated: only length, word choice, warmth and emoji follow your style. The example replies shown to the model are first put into standard spelling, and every finished draft is cleaned deterministically, by the rules of the draft's language: capitals at sentence starts and for names, terminal punctuation and no space before it. Vietnamese drafts also get decimal commas for ratings and dot grouping for amounts ("4,5 sao", "2.000.000đ"), "Xin chào" in place of a time-of-day greeting such as "Chào buổi chiều" (a draft is read at an unknown hour), and every diacritic is kept. English drafts get capitals and punctuation only.
 5. **Safety.** Text from outside (scraped listings, customers, other people in your exports) is wrapped in delimiters and treated as data. The finished draft is scanned for links, prices, discounts and bank details that no source supports, and flagged for you if it finds any.
 
 The AI Style page shows the full trace for any test message: the habits applied, the examples used with their similarity, and the facts found.
 
 ## How well did it work
 
-We measured it on one owner's real chats (Indonesian, 6 exports, 416 training pairs, 23 held-out pairs) with local models (gemma4 for writing, qwen3-embedding for vectors). For each held-out customer message we compared the owner's real reply, a generic AI reply, and a reply with AI Style.
+We measured it on one owner's real chats (Indonesian, measured in an earlier version before Vietnamese support; the same test has not been run on Vietnamese chats, 6 exports, 416 training pairs, 23 held-out pairs) with local models (gemma4 for writing, qwen3-embedding for vectors). For each held-out customer message we compared the owner's real reply, a generic AI reply, and a reply with AI Style.
 
 | | Real replies | Generic AI | With AI Style |
 |---|---|---|---|

@@ -84,3 +84,28 @@ Status: first translation, **not yet reviewed by a native speaker** (release gat
 ## Not in these dictionaries (covered by later slices and the prompts)
 
 The WhatsApp opt-out line, the email footer, the unsubscribe pages and canned replies use `anh/chị` and `Trân trọng,` (PRD FR-22, FR-29, FR-34, FR-42). They are reviewed together with this glossary (QA checklist 3.6 items 5 to 9) and must use the same terms: `bản nháp`, `duyệt`, `từ chối nhận tin`, `STOP`.
+
+## Wording outside the dictionaries that needs the same review
+
+These live in the API, not in `vi.ts`; they are part of the native-speaker release gate (QA checklist 3.6 items 5 to 10):
+
+- the WhatsApp opt-out line (`OPT_OUT_HINT_VI` in `apps/api/src/messaging/opt-out.ts`) and the stored lost-reason `STOP_REASON`;
+- the email footer line (`FOOTER_LINE`, `email/email-utils.ts`) and the public unsubscribe page (`email/unsubscribe.controller.ts`);
+- canned replies and fallbacks (`REPLY_TEMPLATES`, `FALLBACKS` in `messaging/reply-plan.ts`) and the default business text;
+- the Vietnamese prompt block and exemplars (`OUTPUT_RULES`, `OUTPUT_NOTE` in `ai/chat-import/style-prompt.ts`), closings, the link label "Xem thêm", the subject promo-word list;
+- brief gap and grounding notes (`GAP_TEXT` in `marketing/brief-schema.ts`);
+- the lists of Vietnamese opt-out phrases, reply-intent patterns, slang and question words, which decide what is accepted or rejected.
+
+## Proposed CLAUDE.md edit (needs the user's approval, not applied)
+
+The repository-root `CLAUDE.md` still names the removed Indonesian dictionary. Replace this sentence in the **Frontend** section:
+
+Current:
+
+> UI text goes through `useI18n().t(key)`: add every new string to `src/lib/i18n/en.ts` and `id.ts` (Indonesian must define every key). Server components may import only from `src/lib/i18n/lang.ts` (the rest is a client module).
+
+Proposed:
+
+> UI text goes through `useI18n().t(key)`: add every new string to `src/lib/i18n/en.ts` and `vi.ts` (Vietnamese must define every key; see `docs/i18n-vi-glossary.md`). Server components may import only from `src/lib/i18n/lang.ts` (the rest is a client module).
+
+The Messaging and AI sections of `CLAUDE.md` also gain one useful line, if you agree: "The output language is `vietnamese` or `english` (`apps/api/src/common/language.ts`); read every stored or queued language through `toOutputLanguage()`, put it into a prompt only through `LANGUAGE_LABEL`, and add wording per language in a frozen `Record<OutputLanguage, ...>` table."
