@@ -1,5 +1,5 @@
 import { PrismaService } from "../prisma/prisma.service";
-import { OPT_OUT_HINT_EN, OPT_OUT_HINT_ID_LEGACY, OPT_OUT_HINT_VI } from "./opt-out";
+import { stripOptOutHints } from "./opt-out";
 import { analyzeConversation, type ConversationMessage, type ConversationState } from "./thread";
 
 export interface LoadedConversation extends ConversationState {
@@ -11,7 +11,7 @@ export interface LoadedConversation extends ConversationState {
   replies: { id: string; body: string; intent: string | null }[];
 }
 
-const plain = (t: string) => t.replace(OPT_OUT_HINT_ID_LEGACY, "").replace(OPT_OUT_HINT_EN, "").replace(OPT_OUT_HINT_VI, "").trim();
+const plain = stripOptOutHints;
 
 /**
  * The whole WhatsApp conversation with one lead: what Prospex sent, what the owner typed on their phone (stored as source

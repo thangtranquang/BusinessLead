@@ -3,7 +3,7 @@ import { AiClientService } from "../ai/ai-client.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { loadConversation } from "./conversation-loader";
 import { InboundService } from "./inbound.service";
-import { isOptOut } from "./opt-out";
+import { isOptOut, STOP_REASON } from "./opt-out";
 import { classifyReply, intentMessages, parseIntent, planReplyOutcome, STAGE_ORDER, type ReplyIntent } from "./reply-intent";
 import { peakOfConversation } from "./stage-peak";
 
@@ -100,8 +100,8 @@ export class ReclassifyService {
         withdrawn += pending.length;
         if (!o.apply) continue;
         if (stopped) {
-          await this.prisma.messageOptOut.upsert({ where: { workspaceId_phone: { workspaceId, phone } }, create: { workspaceId, phone, reason: "Meminta berhenti (STOP)" }, update: {} });
-          await this.prisma.lead.update({ where: { id: lead.id }, data: { crmStatus: "lost", lostReason: "Meminta berhenti (STOP)", needsReply: false, closedAt: new Date(), lastIntent: "not_interested" } });
+          await this.prisma.messageOptOut.upsert({ where: { workspaceId_phone: { workspaceId, phone } }, create: { workspaceId, phone, reason: STOP_REASON }, update: {} });
+          await this.prisma.lead.update({ where: { id: lead.id }, data: { crmStatus: "lost", lostReason: STOP_REASON, needsReply: false, closedAt: new Date(), lastIntent: "not_interested" } });
           await this.prisma.leadActivity.create({ data: { leadId: lead.id, type: "opted_out", note: "Ditemukan saat membaca ulang percakapan" } });
           blocked.add(phone);
         } else {

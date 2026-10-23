@@ -3,6 +3,9 @@
  * wrapper (disappearing messages, view-once), and the owner's own messages from their phone are often a PDF or a picture.
  * Both matter to the conversation, so they are read here instead of being dropped.
  */
+import { CONTACT_CARD_RE, WA_INBOUND_MARKERS } from "../common/conversation-markers";
+import { nfc, sliceChars } from "../common/text";
+
 export interface WaMessageLike {
   conversation?: string | null;
   extendedTextMessage?: { text?: string | null } | null;
@@ -25,7 +28,8 @@ function unwrap(m: WaMessageLike | null | undefined, depth = 0): WaMessageLike |
   return inner ? unwrap(inner, depth + 1) : m;
 }
 
-const clean = (s: string | null | undefined) => (s ?? "").trim();
+/** Text of a message as NFC (a phone may send decomposed Vietnamese), trimmed. */
+const clean = (s: string | null | undefined) => nfc(s).trim();
 
 /** Phone numbers in a vCard: the WhatsApp id when present ("waid=628..."), else the TEL line. */
 export function vcardPhones(vcard: string | null | undefined): string[] {
@@ -43,7 +47,7 @@ export function vcardPhones(vcard: string | null | undefined): string[] {
 
 function contactCards(m: WaMessageLike): string {
   const cards = [...(m.contactMessage ? [m.contactMessage] : []), ...(m.contactsArrayMessage?.contacts ?? [])].slice(0, 5);
-  return cards.map((c) => `[Kontak: ${clean(c.displayName).slice(0, 60) || "tanpa nama"}${vcardPhones(c.vcard).length ? ` ${vcardPhones(c.vcard).join(", ")}` : ""}]`).join(" ");
+  return cards.map((c) => WA_INBOUND_MARKERS.contact(sliceChars(clean(c.displayName), 60), vcardPhones(c.vcard).join(", "))).join(" ");
 }
 
 /**
@@ -54,7 +58,7 @@ export function messageText(message: WaMessageLike | null | undefined, opts: { m
   const m = unwrap(message);
   if (!m) return "";
   const words = clean(m.conversation) || clean(m.extendedTextMessage?.text) || clean(m.imageMessage?.caption) || clean(m.videoMessage?.caption) || clean(m.documentMessage?.caption);
-  const marker = m.documentMessage ? `[Dokumen: ${clean(m.documentMessage.fileName).slice(0, 80) || "file"}]` : m.imageMessage ? "[Gambar]" : m.videoMessage ? "[Video]" : m.audioMessage ? "[Pesan suara]" : m.stickerMessage ? "[Stiker]" : "";
+  const marker = m.documentMessage ? WA_INBOUND_MARKERS.document(sliceChars(clean(m.documentMessage.fileName), 80) || WA_INBOUND_MARKERS.documentFallbackName) : m.imageMessage ? WA_INBOUND_MARKERS.image : m.videoMessage ? WA_INBOUND_MARKERS.video : m.audioMessage ? WA_INBOUND_MARKERS.voice : m.stickerMessage ? WA_INBOUND_MARKERS.sticker : "";
   // a shared contact is content, not a decoration: someone passing us on to another number is exactly what must not be lost
   const cards = contactCards(m);
   if (cards) return words ? `${cards} ${words}` : cards;
@@ -66,7 +70,8 @@ export function messageText(message: WaMessageLike | null | undefined, opts: { m
 export interface Referral { name: string | null; phone: string }
 
 /** The contacts someone passed us: shared cards ("[Kontak: Nama +62...]") and numbers written in the text. At most 5. */
-export function parseReferrals(text: string): Referral[] {
+export function parseReferrals(input: string): Referral[] {
+  const text = nfc(input);
   const out: Referral[] = [];
   const seen = new Set<string>();
   const add = (name: string | null, phone: string) => {
@@ -75,13 +80,13 @@ export function parseReferrals(text: string): Referral[] {
     seen.add(key);
     out.push({ name, phone });
   };
-  for (const m of text.slice(0, 4000).matchAll(/\[Kontak:\s*([^\]]{0,160})\]/gi)) {
+  for (const m of text.slice(0, 4000).matchAll(CONTACT_CARD_RE)) {
     const body = m[1].trim();
     const nums = [...body.matchAll(/\+?\d[\d\s-]{6,}\d/g)].map((n) => n[0].trim());
     const name = body.replace(/\+?\d[\d\s-]{6,}\d/g, "").replace(/[,\s]+$/g, "").trim() || null;
-    for (const n of nums) add(name === "tanpa nama" ? null : name, n);
+    for (const n of nums) add(name === WA_INBOUND_MARKERS.noName ? null : name, n);
   }
-  const outside = text.replace(/\[Kontak:[^\]]*\]/gi, " ");
+  const outside = text.replace(CONTACT_CARD_RE, " ");
   for (const m of outside.slice(0, 4000).matchAll(/(?<![\d+])(\+?62|0)8[\d\s-]{7,13}\d/g)) add(null, m[0].trim());
   return out;
 }

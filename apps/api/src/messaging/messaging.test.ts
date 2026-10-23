@@ -65,10 +65,10 @@ test("looksLikeInjection flags instructions aimed at the AI", () => {
   for (const t of ["Berapa harga paket website?", "Can you act on Monday? I am free then", "terima kasih, nanti saya kabari"]) assert.equal(looksLikeInjection(t), false, t);
 });
 test("draftRisks flags unsupported links, prices and discounts but not facts from the knowledge base", () => {
-  assert.deepEqual(draftRisks("Halo, kunjungi https://x.co untuk diskon 90%", [], "vietnamese").sort(), ["discount", "link", "percentage"].sort());
-  assert.deepEqual(draftRisks("Paket mulai Rp 2.000.000", ["Paket mulai Rp 2.000.000 per bulan"], "vietnamese"), []);
-  assert.deepEqual(draftRisks("Transfer ke rekening BCA saya", [], "vietnamese"), ["bank details"]);
-  assert.deepEqual(draftRisks("Halo, boleh kita bahas minggu depan?", [], "vietnamese"), []);
+  assert.deepEqual(draftRisks("Xin chào anh/chị, xem https://x.co để được giảm giá 90%", [], "vietnamese").sort(), ["discount", "link", "percentage"].sort());
+  assert.deepEqual(draftRisks("Gói bắt đầu từ 2.000.000đ", ["Gói bắt đầu từ 2.000.000đ mỗi tháng"], "vietnamese"), []);
+  assert.deepEqual(draftRisks("Anh/chị chuyển khoản vào số tài khoản của em nhé", [], "vietnamese"), ["bank details"]);
+  assert.deepEqual(draftRisks("Anh/chị có muốn bàn thêm vào tuần sau không ạ?", [], "vietnamese"), []);
 });
 
 test("phoneFromKey reads the number from senderPn when the chat is addressed by an opaque LID", () => {
@@ -137,9 +137,9 @@ test("a shop's automatic greeting is recognised and changes nothing", () => {
 import { neutralHonorific } from "./plain-text";
 
 test("neutralHonorific replaces a guessed honorific but keeps a named one", () => {
-  assert.equal(neutralHonorific("agar Bapak bisa melihat", "vietnamese"), "agar Anda bisa melihat");
-  assert.equal(neutralHonorific("Halo Bu Rina", "vietnamese"), "Halo Bu Rina");
-  assert.deepEqual(draftRisks("Rating 5.0 menunjukkan kepercayaan pelanggan yang tinggi", [], "vietnamese"), ["assumption"]);
+  assert.equal(neutralHonorific("để anh có thể xem lịch hẹn", "vietnamese"), "để Quý khách có thể xem lịch hẹn");
+  assert.equal(neutralHonorific("Xin chào chị Lan", "vietnamese"), "Xin chào chị Lan");
+  assert.deepEqual(draftRisks("Đánh giá 5.0 cho thấy chắc chắn khách hàng rất hài lòng", [], "vietnamese"), ["assumption"]);
 });
 
 test("more shop auto-replies are recognised", () => {
@@ -154,8 +154,8 @@ test("more shop auto-replies are recognised", () => {
 import { removeEmoji, neutralHonorificChat } from "./plain-text";
 
 test("replies to prospects carry no emoji and no guessed honorific", () => {
-  assert.equal(removeEmoji("Siap, Kak. 😁🙏🏽 Terima kasih"), "Siap, Kak. Terima kasih");
-  assert.equal(neutralHonorificChat("Mana yang Mbak lihat simpel", "vietnamese"), "Mana yang Kak lihat simpel");
+  assert.equal(removeEmoji("Dạ vâng. 😁🙏🏽 Cảm ơn anh/chị"), "Dạ vâng. Cảm ơn anh/chị");
+  assert.equal(neutralHonorificChat("Dạ anh xem cái nào đơn giản ạ", "vietnamese"), "Dạ anh/chị xem cái nào đơn giản ạ");
 });
 
 import { looksAutomaticByTiming } from "./reply-intent";

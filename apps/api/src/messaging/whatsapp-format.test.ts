@@ -38,13 +38,12 @@ test("one unbroken block is split into greeting, body and closing", () => {
 
 import { tidyWhatsappOutreach } from "./plain-text";
 
-test("the first message greets with Kak and never says Bapak/Ibu", () => {
-  assert.equal(tidyWhatsappOutreach("Halo,\n\nPerkenalkan saya dari X.", "vietnamese"), "Halo, Kak.\n\nPerkenalkan saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Halo, Kak. Jika Bapak/Ibu berkenan, kami siap.", "vietnamese"), "Halo, Kak. Jika Kakak berkenan, kami siap.");
-  assert.equal(tidyWhatsappOutreach("Halo Perkenalkan saya dari X.", "vietnamese"), "Halo, Kak. Perkenalkan saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Halo, Kak. Saya dari X.", "vietnamese"), "Halo, Kak. Saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Halo Bapak/Ibu,\n\nSaya dari X.", "vietnamese"), "Halo, Kak.\n\nSaya dari X.");
-  assert.equal(tidyWhatsappOutreach("Hai Kakak, saya dari X.", "vietnamese"), "Halo, Kak. saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Pak Budi, selamat siang.", "vietnamese"), "Pak Budi, selamat siang.");
-  assert.equal(tidyWhatsappOutreach("Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?", "vietnamese"), "Halo, Kak. Apakah Kakak ingin berdiskusi tentang bisnis Kakak?");
+test("the first message greets with anh/chị and never guesses a gender (Vietnamese)", () => {
+  assert.equal(tidyWhatsappOutreach("Chào,\n\nEm là Minh Anh đến từ Công ty Mẫu.", "vietnamese"), "Xin chào anh/chị,\n\nEm là Minh Anh đến từ Công ty Mẫu.");
+  assert.equal(tidyWhatsappOutreach("Chào chị, em là Minh Anh.", "vietnamese"), "Xin chào anh/chị, em là Minh Anh.");
+  assert.equal(tidyWhatsappOutreach("Xin chào anh/chị, em là Minh Anh.", "vietnamese"), "Xin chào anh/chị, em là Minh Anh.");
+  assert.equal(tidyWhatsappOutreach("Xin chào chị Lan, em là Minh Anh.", "vietnamese"), "Xin chào chị Lan, em là Minh Anh.");
+  assert.equal(tidyWhatsappOutreach("Anh/chị có muốn xem thử không ạ?", "vietnamese"), "Anh/chị có muốn xem thử không ạ?");
+  // English drafts are not rewritten by the Vietnamese rules (nor, any more, by Indonesian ones)
+  assert.equal(tidyWhatsappOutreach("Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?", "english"), "Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?");
 });

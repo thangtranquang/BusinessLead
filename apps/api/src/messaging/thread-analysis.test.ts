@@ -27,7 +27,7 @@ test("the owner's message sent from the phone counts, and a later reply reopens 
   const c = analyzeConversation([out(0, "Halo"), them(min(5), "Berapa?"), out(min(6), "[Dokumen: Brosur.pdf]"), them(min(30), "Mahal", false)]);
   assert.equal(c.answered, false);
   assert.equal(c.incoming, "Mahal");
-  assert.match(c.history, /Saya: \[Dokumen: Brosur.pdf\]/);
+  assert.match(c.history, /Me: \[Dokumen: Brosur.pdf\]/);
 });
 
 test("no messages at all is not answered and has no reply", () => {

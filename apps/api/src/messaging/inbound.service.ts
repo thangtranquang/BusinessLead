@@ -2,7 +2,8 @@ import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { MessageWriterService } from "./message-writer.service";
-import { isOptOut, looksLikeInjection, OPT_OUT_HINT_EN, OPT_OUT_HINT_ID_LEGACY, OPT_OUT_HINT_VI } from "./opt-out";
+import { isOptOut, looksLikeInjection, STOP_REASON, stripOptOutHints } from "./opt-out";
+import { capThenNfc, nfc, sliceChars } from "../common/text";
 import { planReplyAction } from "./reply-plan";
 import { classifyReply, intentMessages, looksAutomaticByTiming, parseIntent, planReplyOutcome, type ReplyIntent } from "./reply-intent";
 import { AiClientService } from "../ai/ai-client.service";
@@ -61,7 +62,9 @@ export class InboundService implements OnModuleInit {
     }
   }
 
-  async handle(workspaceId: string, msg: InboundWhatsappMessage) {
+  async handle(workspaceId: string, original: InboundWhatsappMessage) {
+    // one normal form from the start: what is stored, matched and shown is NFC (FR-44.1)
+    const msg = { ...original, text: capThenNfc(original.text, 4000) };
     const lead = await this.prisma.lead.findFirst({ where: { workspaceId, phoneE164: msg.phone }, orderBy: { createdAt: "desc" }, include: { campaign: { select: { yourService: true, language: true } } } });
     try {
       await this.prisma.inboundMessage.create({ data: { workspaceId, leadId: lead?.id, fromPhone: msg.phone, body: msg.text.slice(0, 4000), providerMessageId: msg.id, receivedAt: msg.at } });
@@ -77,7 +80,7 @@ export class InboundService implements OnModuleInit {
         await this.prisma.leadActivity.create({ data: { leadId: lead.id, type: "opted_out", note: msg.text.slice(0, 140) } });
         // an explicit STOP is the one reply that closes a deal by itself
         if (!["won", "lost"].includes(lead.crmStatus)) {
-          await this.prisma.lead.update({ where: { id: lead.id }, data: { crmStatus: "lost", lostReason: "Meminta berhenti (STOP)", needsReply: false, closedAt: new Date(), repliedAt: msg.at } });
+          await this.prisma.lead.update({ where: { id: lead.id }, data: { crmStatus: "lost", lostReason: STOP_REASON, needsReply: false, closedAt: new Date(), repliedAt: msg.at } });
         }
       }
       this.logger.log(`Opt-out recorded for ${workspaceId}`);
@@ -88,7 +91,7 @@ export class InboundService implements OnModuleInit {
     // seconds after our message and no clear question: a shop's greeting bot, not a person
     const conv = await this.conversation(workspaceId, lead.id, msg.phone, msg.text);
     const lastSent = await this.prisma.outboundMessage.findFirst({ where: { workspaceId, toPhone: msg.phone, channel: "whatsapp", status: "sent" }, orderBy: { sentAt: "desc" }, select: { sentAt: true, body: true } });
-    const lastMine = (lastSent?.body ?? "").replace(OPT_OUT_HINT_ID_LEGACY, "").replace(OPT_OUT_HINT_EN, "").replace(OPT_OUT_HINT_VI, "").trim();
+    const lastMine = stripOptOutHints(lastSent?.body ?? "");
     const quick = lastSent?.sentAt ? msg.at.getTime() - lastSent.sentAt.getTime() : null;
     const priorInbound = await this.prisma.inboundMessage.count({ where: { workspaceId, fromPhone: msg.phone, providerMessageId: { not: msg.id } } });
     // one bubble can be a shop's greeting; otherwise what they just said is everything written together, read against the thread
@@ -131,14 +134,14 @@ export class InboundService implements OnModuleInit {
   async handleOwnMessage(workspaceId: string, msg: OwnWhatsappMessage): Promise<"recorded" | "ignored"> {
     const lead = await this.prisma.lead.findFirst({ where: { workspaceId, phoneE164: msg.phone }, orderBy: { createdAt: "desc" } });
     if (!lead || !msg.text.trim()) return "ignored";
-    const text = msg.text.trim().slice(0, 8000);
+    const text = sliceChars(nfc(msg.text).trim(), 8000);
     // already known: something Prospex sent itself (the event comes back for our own messages), or this exact message seen before
     const recent = await this.prisma.outboundMessage.findMany({
       where: { workspaceId, channel: "whatsapp", OR: [{ providerMessageId: msg.id }, { toPhone: msg.phone, status: { in: ["approved", "sending", "sent"] }, updatedAt: { gte: new Date(Date.now() - SAME_MESSAGE_WINDOW_MS) } }] }, // updatedAt, not createdAt: a draft approved hours ago is claimed (and its event arrives) now
       select: { providerMessageId: true, body: true },
       take: 30,
     });
-    if (recent.some((m) => m.providerMessageId === msg.id || m.body.trim() === text)) return "ignored";
+    if (recent.some((m) => m.providerMessageId === msg.id || nfc(m.body).trim() === text)) return "ignored";
 
     await this.prisma.outboundMessage.create({
       data: { workspaceId, leadId: lead.id, channel: "whatsapp", toPhone: msg.phone, body: text, source: "external", status: "sent", approvedAt: msg.at, sentAt: msg.at, providerMessageId: msg.id, context: { external: true } },

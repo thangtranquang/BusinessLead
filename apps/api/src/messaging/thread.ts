@@ -3,6 +3,9 @@
  * bubbles written together are answered together. But only bubbles written together: a shop's canned greeting from half an hour
  * earlier, or yesterday's chat, is history, never part of "what they just said".
  */
+import { ME_PREFIX, speakerLine } from "../common/conversation-markers";
+import { capThenNfc } from "../common/text";
+
 export interface ThreadLine { mine: boolean; text: string; at: number }
 
 /** Bubbles this close to the next one belong to the same answer. */
@@ -14,12 +17,20 @@ export function buildThread(lines: ThreadLine[], latest: string): { history: str
   const sorted = [...lines].sort((a, b) => a.at - b.at);
   let cut = sorted.length;
   while (cut > 0 && !sorted[cut - 1].mine && (cut === sorted.length || sorted[cut].at - sorted[cut - 1].at <= SAME_ANSWER_MS)) cut--;
-  const burst = sorted.slice(cut).map((l) => l.text.trim().slice(0, MAX_BUBBLE)).filter(Boolean);
+  const bubble = (text: string) => capThenNfc(text.trim(), MAX_BUBBLE);
+  const burst = sorted.slice(cut).map((l) => bubble(l.text)).filter(Boolean);
   const earlier = sorted.slice(0, cut).slice(-HISTORY_LINES);
   return {
-    history: earlier.map((l) => `${l.mine ? "Saya" : "Mereka"}: ${l.text.trim().slice(0, MAX_BUBBLE)}`).join("\n"),
-    incoming: burst.length ? burst.join("\n") : latest.slice(0, MAX_BUBBLE),
+    // every line of a bubble carries its speaker, so a customer line written as "Me: ..." stays the customer's
+    history: earlier.map((l) => speakerLine(l.mine, bubble(l.text))).join("\n"),
+    incoming: burst.length ? burst.join("\n") : bubble(latest),
   };
+}
+
+/** The text of our own last line in a history built by `buildThread` (a line the customer wrote can never start with our label). */
+export function lastOwnLine(history: string): string {
+  const line = history.split("\n").reverse().find((l) => l.startsWith(ME_PREFIX));
+  return line ? line.slice(ME_PREFIX.length).trim() : "";
 }
 
 /** One message of a lead's conversation, from either side. `auto` marks a shop's automatic message (not a person speaking). */
@@ -54,6 +65,6 @@ export function analyzeConversation(messages: ConversationMessage[], latest = ""
   for (let i = all.length - 1; i >= 0; i--) if (!all[i].mine) { last = i; break; }
   let start = last;
   while (last >= 0 && start > 0 && !all[start - 1].mine && all[start].at - all[start - 1].at <= SAME_ANSWER_MS) start--;
-  const theirLast = last >= 0 ? all.slice(start, last + 1).map((m) => m.text.trim().slice(0, MAX_BUBBLE)).filter(Boolean).join("\n") : "";
+  const theirLast = last >= 0 ? all.slice(start, last + 1).map((m) => capThenNfc(m.text.trim(), MAX_BUBBLE)).filter(Boolean).join("\n") : "";
   return { newestReply, newestOwn, answered: newestReply !== null && newestOwn !== null && newestOwn > newestReply, history: t.history, incoming: t.incoming, theirLast };
 }

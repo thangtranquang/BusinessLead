@@ -18,6 +18,7 @@ import { neutralGreeting, normalizeDraft } from "../ai/orthography";
 import { briefForDraft, foreignVerticalWords } from "../marketing/brief-use";
 import type { BriefContent } from "../marketing/brief-schema";
 import { OPT_OUT_HINT } from "./opt-out";
+import { lastOwnLine } from "./thread";
 import { toOutputLanguage, type OutputLanguage } from "../common/language";
 
 export interface WrittenMessage {
@@ -251,7 +252,7 @@ export class MessageWriterService {
     const profile = await this.prisma.styleProfile.findUnique({ where: { workspaceId } });
     if (!profile) throw new BadRequestException("No style profile yet");
     // "boleh" or "iya" alone say nothing about the topic: search with what we last said as well
-    const lastMine = history.split("\n").reverse().find((l) => l.startsWith("Saya:"))?.slice(5).trim() ?? "";
+    const lastMine = lastOwnLine(history);
     const topicQuery = `${lastMine.slice(0, 300)} ${incoming}`.trim();
     let examples: { incoming: string; reply: string; similarity: number }[] = [];
     try {

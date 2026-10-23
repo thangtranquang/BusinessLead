@@ -167,7 +167,7 @@ async function main() {
   check("the activity log shows it", (await prisma.leadActivity.count({ where: { leadId: lead.id, type: "whatsapp_sent_phone" } })) === 1);
   check("the same event twice is recorded once", (await inbound.handleOwnMessage(ws, { phone: phone6, text: "Baik kak, ini penawarannya", id: "own-1", at: ownAt })) === "ignored" && (await prisma.outboundMessage.count({ where: { workspaceId: ws, source: "external" } })) === 1);
   const conv = await inbound.conversation(ws, lead.id, phone6, "");
-  check("the conversation includes the owner's own message and says it is answered", conv.answered && /Saya: Baik kak, ini penawarannya/.test(conv.history));
+  check("the conversation includes the owner's own message and says it is answered", conv.answered && /Me: Baik kak, ini penawarannya/.test(conv.history));
   check("no draft is written for something already answered", (await inbound.draftReply(ws, lead.id)) === "answered");
   check("the owner's phone messages do not count against the sending limits", (await prisma.outboundMessage.count({ where: { workspaceId: ws, source: { notIn: ["ai_reply", "external"] }, status: "sent" } })) >= 0 && ext.source === "external");
 
