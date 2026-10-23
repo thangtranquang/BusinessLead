@@ -9,6 +9,7 @@ import { decryptSecret, encryptSecret } from "../settings/encryption.util";
 import { createTransport, friendlySmtpError } from "./email-transport";
 import { fitAllowed, fitLevel } from "../messaging/fit-gate";
 import { headerLine, isPublicUnsubscribeBase, unsubscribeBase } from "./email-utils";
+import { DEFAULT_OUTPUT_LANGUAGE, toOutputLanguage } from "../common/language";
 
 export const MAX_GENERATE = 200;
 
@@ -161,7 +162,7 @@ export class EmailService {
       for (const { lead, to } of plan) {
         try {
           const w = await this.writer.outreach(workspaceId, lead, undefined, "email");
-          const language = lead.campaign.language === "english" ? "english" : "indonesian";
+          const language = toOutputLanguage(lead.campaign.language);
           const subject = await this.writer.subjectFor(workspaceId, w.text, language);
           await this.prisma.outboundMessage.create({
             data: { workspaceId, leadId: lead.id, channel: "email", toEmail: to, subject, body: w.text, aiBody: w.text, source: "ai_outreach", status: "draft", context: { language, flagged: w.risks.length > 0, risks: w.risks, trace: w.trace } },
@@ -194,7 +195,7 @@ export class EmailService {
     if (await this.prisma.emailOptOut.findUnique({ where: { workspaceId_email: { workspaceId, email: to } } })) throw new BadRequestException("This address has opted out and cannot be emailed");
     if (input.leadId && !(await this.prisma.lead.findFirst({ where: { id: input.leadId, workspaceId }, select: { id: true } }))) throw new NotFoundException("Lead not found");
     return this.prisma.outboundMessage.create({
-      data: { workspaceId, leadId: input.leadId ?? null, channel: "email", toEmail: to, subject, body, aiBody: null, source: "manual", status: "draft", context: { manual: true, language: "indonesian" } },
+      data: { workspaceId, leadId: input.leadId ?? null, channel: "email", toEmail: to, subject, body, aiBody: null, source: "manual", status: "draft", context: { manual: true, language: DEFAULT_OUTPUT_LANGUAGE } },
     });
   }
 }

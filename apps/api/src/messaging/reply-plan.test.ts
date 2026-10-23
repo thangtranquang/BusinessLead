@@ -14,14 +14,14 @@ test("planReplyAction picks the action in code", () => {
 
 test("templates are polite and have no emoji or commands", () => {
   for (const a of ["thanks_close", "thanks_wait", "thanks_later"] as const) {
-    const t = templateReply(a, "indonesian")!;
-    assert.deepEqual(checkReply(t, { alreadyIntroduced: true, knownText: "" }), []);
+    const t = templateReply(a, "vietnamese")!;
+    assert.deepEqual(checkReply(t, { alreadyIntroduced: true, knownText: "", language: "vietnamese" }), []);
   }
-  assert.equal(templateReply("answer", "indonesian"), null);
+  assert.equal(templateReply("answer", "vietnamese"), null);
 });
 
 test("checkReply catches the failures seen in real drafts", () => {
-  const ctx = { alreadyIntroduced: true, knownText: "" };
+  const ctx = { alreadyIntroduced: true, knownText: "", language: "vietnamese" as const };
   assert.ok(checkReply("Siapp, Kak. Kabari saja ya kalau sudah.", ctx).includes("commanding tone"));
   assert.ok(checkReply("Baik, Kak. Saya dari contoh.id, kami bantu software sewa dan rental.", ctx).includes("introduces itself again"));
   assert.ok(checkReply("Baik, Kak 😁 terima kasih banyak", ctx).includes("emoji"));
@@ -30,14 +30,14 @@ test("checkReply catches the failures seen in real drafts", () => {
 });
 
 test("a reply that talks about roles instead of answering is rejected", () => {
-  assert.match(checkReply("Baik, Kak. Saya bukan pelanggan, Kak. Saya pemilik bisnis yang ingin tahu apakah sistem kami cocok.", { alreadyIntroduced: false, knownText: "" }).join(" "), /roles/);
-  assert.match(checkReply("Baik, Kak. Kami ini bukan penyewa, Kak.", { alreadyIntroduced: false, knownText: "" }).join(" "), /roles/);
-  assert.deepEqual(checkReply("Baik, Kak. Terima kasih, contoh tampilannya saya kirimkan sekarang ya.", { alreadyIntroduced: true, knownText: "" }), []);
+  assert.match(checkReply("Baik, Kak. Saya bukan pelanggan, Kak. Saya pemilik bisnis yang ingin tahu apakah sistem kami cocok.", { alreadyIntroduced: false, knownText: "", language: "vietnamese" }).join(" "), /roles/);
+  assert.match(checkReply("Baik, Kak. Kami ini bukan penyewa, Kak.", { alreadyIntroduced: false, knownText: "", language: "vietnamese" }).join(" "), /roles/);
+  assert.deepEqual(checkReply("Baik, Kak. Terima kasih, contoh tampilannya saya kirimkan sekarang ya.", { alreadyIntroduced: true, knownText: "", language: "vietnamese" }), []);
 });
 
 test("pointing us to another contact is answered with fixed wording and never a pitch", () => {
   assert.equal(planReplyAction("referral", "[Kontak: Contoh +628120000000] halo untuk penawaran hubungi management ya"), "thanks_referral");
   assert.equal(planReplyAction("referral", "silakan hubungi management kami"), "ask_contact");
-  assert.match(templateReply("thanks_referral", "indonesian") ?? "", /hubungi nomor tersebut/);
-  assert.match(templateReply("ask_contact", "indonesian") ?? "", /nomor atau kontak/);
+  assert.match(templateReply("thanks_referral", "vietnamese") ?? "", /hubungi nomor tersebut/);
+  assert.match(templateReply("ask_contact", "vietnamese") ?? "", /nomor atau kontak/);
 });

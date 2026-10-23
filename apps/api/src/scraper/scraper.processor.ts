@@ -9,6 +9,7 @@ import { EnrichmentService } from "../leads/enrichment.service";
 import { FitService } from "../ai/fit.service";
 import { MarketingAiService } from "../ai/marketing-ai.service";
 import { planAreas, stripPlaces } from "./areas";
+import { toOutputLanguage } from "../common/language";
 import { GoogleMapsScraperService } from "./google-maps.scraper";
 
 /** Two results are the same business when they share a phone number, or else a name and an address. */
@@ -50,6 +51,8 @@ export class ScraperProcessor extends WorkerHost {
   async process(job: Job<ScraperJobData>): Promise<void> {
     const data = job.data;
     const { campaignId, workspaceId } = data;
+    // a job queued before the language change carries "indonesian"; read it through the normaliser like every other consumer
+    const language = toOutputLanguage(data.language);
     this.logger.log(`Starting campaign ${campaignId} (job ${job.id})`);
 
     try {
@@ -66,7 +69,7 @@ export class ScraperProcessor extends WorkerHost {
       await this.campaigns.updateStatus(campaignId, "running", 30);
 
       // Fit is judged per business from its name and real Google Maps category, against the offer and the Marketing Brief (needs an AI provider).
-      const fits = await this.fit.assess(workspaceId, rawLeads.map((l) => ({ name: l.name, category: l.category })), data.yourService, data.language === "english" ? "english" : "indonesian");
+      const fits = await this.fit.assess(workspaceId, rawLeads.map((l) => ({ name: l.name, category: l.category })), data.yourService, language);
       const scoredLeads = this.leadIntelligence.scoreLeads(rawLeads, fits);
       await this.campaigns.updateStatus(campaignId, "running", 60);
 
@@ -83,7 +86,7 @@ export class ScraperProcessor extends WorkerHost {
                 hasWebsite: lead.hasWebsite,
                 yourService: data.yourService,
                 contentStyle: data.contentStyle,
-                language: data.language,
+                language,
                 score: lead.score,
               });
             } catch (e) {

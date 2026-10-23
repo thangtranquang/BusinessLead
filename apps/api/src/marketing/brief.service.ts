@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnav
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { outputLanguageOrDefault, type OutputLanguage } from "../common/language";
 import { AiClientService } from "../ai/ai-client.service";
 import { KnowledgeService } from "../ai/knowledge.service";
 import { buildBriefMessages, type BriefPass, type BriefSource } from "./brief-prompt";
@@ -20,7 +21,7 @@ export interface GenerateInput {
   notes?: string;
   industry?: string;
   location?: string;
-  language?: "indonesian" | "english";
+  language?: OutputLanguage;
 }
 
 export interface BriefView {
@@ -174,7 +175,7 @@ export class BriefService {
   async generate(workspaceId: string, input: GenerateInput, onPass?: (pass: string) => void): Promise<BriefView> {
     const ai = await this.ai.forWorkspace(workspaceId);
     if (!ai.enabled) throw new ServiceUnavailableException("AI provider is not configured");
-    const language = input.language === "english" ? "english" : "indonesian";
+    const language = outputLanguageOrDefault(input.language);
     const rows = await this.prisma.knowledgeSource.findMany({
       where: { workspaceId, ...(input.sourceIds?.length ? { id: { in: input.sourceIds } } : {}), text: { not: null } },
       orderBy: { createdAt: "desc" },

@@ -65,10 +65,10 @@ test("looksLikeInjection flags instructions aimed at the AI", () => {
   for (const t of ["Berapa harga paket website?", "Can you act on Monday? I am free then", "terima kasih, nanti saya kabari"]) assert.equal(looksLikeInjection(t), false, t);
 });
 test("draftRisks flags unsupported links, prices and discounts but not facts from the knowledge base", () => {
-  assert.deepEqual(draftRisks("Halo, kunjungi https://x.co untuk diskon 90%", []).sort(), ["discount", "link", "percentage"].sort());
-  assert.deepEqual(draftRisks("Paket mulai Rp 2.000.000", ["Paket mulai Rp 2.000.000 per bulan"]), []);
-  assert.deepEqual(draftRisks("Transfer ke rekening BCA saya", []), ["bank details"]);
-  assert.deepEqual(draftRisks("Halo, boleh kita bahas minggu depan?", []), []);
+  assert.deepEqual(draftRisks("Halo, kunjungi https://x.co untuk diskon 90%", [], "vietnamese").sort(), ["discount", "link", "percentage"].sort());
+  assert.deepEqual(draftRisks("Paket mulai Rp 2.000.000", ["Paket mulai Rp 2.000.000 per bulan"], "vietnamese"), []);
+  assert.deepEqual(draftRisks("Transfer ke rekening BCA saya", [], "vietnamese"), ["bank details"]);
+  assert.deepEqual(draftRisks("Halo, boleh kita bahas minggu depan?", [], "vietnamese"), []);
 });
 
 test("phoneFromKey reads the number from senderPn when the chat is addressed by an opaque LID", () => {
@@ -123,7 +123,7 @@ test("stripMarkdown removes symbols that would show literally in a message", () 
 import { withLink } from "./message-writer.service";
 
 test("withLink puts the owner's link before the closing", () => {
-  assert.equal(withLink("Halo,\n\nIsi.\n\nSalam,", "https://example.com/", "indonesian"), "Halo,\n\nIsi.\n\nSelengkapnya: https://example.com/\n\nSalam,");
+  assert.equal(withLink("Halo,\n\nIsi.\n\nSalam,", "https://example.com/", "vietnamese"), "Halo,\n\nIsi.\n\nSelengkapnya: https://example.com/\n\nSalam,");
   assert.equal(withLink("Hello,\n\nBody.", "https://x.id/", "english"), "Hello,\n\nBody.\n\nMore details: https://x.id/");
 });
 
@@ -137,9 +137,9 @@ test("a shop's automatic greeting is recognised and changes nothing", () => {
 import { neutralHonorific } from "./plain-text";
 
 test("neutralHonorific replaces a guessed honorific but keeps a named one", () => {
-  assert.equal(neutralHonorific("agar Bapak bisa melihat"), "agar Anda bisa melihat");
-  assert.equal(neutralHonorific("Halo Bu Rina"), "Halo Bu Rina");
-  assert.deepEqual(draftRisks("Rating 5.0 menunjukkan kepercayaan pelanggan yang tinggi", []), ["assumption"]);
+  assert.equal(neutralHonorific("agar Bapak bisa melihat", "vietnamese"), "agar Anda bisa melihat");
+  assert.equal(neutralHonorific("Halo Bu Rina", "vietnamese"), "Halo Bu Rina");
+  assert.deepEqual(draftRisks("Rating 5.0 menunjukkan kepercayaan pelanggan yang tinggi", [], "vietnamese"), ["assumption"]);
 });
 
 test("more shop auto-replies are recognised", () => {
@@ -155,7 +155,7 @@ import { removeEmoji, neutralHonorificChat } from "./plain-text";
 
 test("replies to prospects carry no emoji and no guessed honorific", () => {
   assert.equal(removeEmoji("Siap, Kak. 😁🙏🏽 Terima kasih"), "Siap, Kak. Terima kasih");
-  assert.equal(neutralHonorificChat("Mana yang Mbak lihat simpel"), "Mana yang Kak lihat simpel");
+  assert.equal(neutralHonorificChat("Mana yang Mbak lihat simpel", "vietnamese"), "Mana yang Kak lihat simpel");
 });
 
 import { looksAutomaticByTiming } from "./reply-intent";

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { MessageWriterService } from "./message-writer.service";
-import { isOptOut, looksLikeInjection, OPT_OUT_HINT_EN, OPT_OUT_HINT_ID } from "./opt-out";
+import { isOptOut, looksLikeInjection, OPT_OUT_HINT_EN, OPT_OUT_HINT_ID_LEGACY, OPT_OUT_HINT_VI } from "./opt-out";
 import { planReplyAction } from "./reply-plan";
 import { classifyReply, intentMessages, looksAutomaticByTiming, parseIntent, planReplyOutcome, type ReplyIntent } from "./reply-intent";
 import { AiClientService } from "../ai/ai-client.service";
@@ -88,7 +88,7 @@ export class InboundService implements OnModuleInit {
     // seconds after our message and no clear question: a shop's greeting bot, not a person
     const conv = await this.conversation(workspaceId, lead.id, msg.phone, msg.text);
     const lastSent = await this.prisma.outboundMessage.findFirst({ where: { workspaceId, toPhone: msg.phone, channel: "whatsapp", status: "sent" }, orderBy: { sentAt: "desc" }, select: { sentAt: true, body: true } });
-    const lastMine = (lastSent?.body ?? "").replace(OPT_OUT_HINT_ID, "").replace(OPT_OUT_HINT_EN, "").trim();
+    const lastMine = (lastSent?.body ?? "").replace(OPT_OUT_HINT_ID_LEGACY, "").replace(OPT_OUT_HINT_EN, "").replace(OPT_OUT_HINT_VI, "").trim();
     const quick = lastSent?.sentAt ? msg.at.getTime() - lastSent.sentAt.getTime() : null;
     const priorInbound = await this.prisma.inboundMessage.count({ where: { workspaceId, fromPhone: msg.phone, providerMessageId: { not: msg.id } } });
     // one bubble can be a shop's greeting; otherwise what they just said is everything written together, read against the thread

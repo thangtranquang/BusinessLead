@@ -17,7 +17,8 @@ import { draftRisks } from "./draft-risk";
 import { neutralGreeting, normalizeDraft } from "../ai/orthography";
 import { briefForDraft, foreignVerticalWords } from "../marketing/brief-use";
 import type { BriefContent } from "../marketing/brief-schema";
-import { OPT_OUT_HINT_EN, OPT_OUT_HINT_ID } from "./opt-out";
+import { OPT_OUT_HINT } from "./opt-out";
+import { toOutputLanguage, type OutputLanguage } from "../common/language";
 
 export interface WrittenMessage {
   text: string;
@@ -32,7 +33,8 @@ type LeadWithCampaign = Lead & { campaign: Pick<Campaign, "yourService" | "langu
 const PLACEHOLDER = /\[[^\]\n]{1,40}\]|\{\{[^}]+\}\}/;
 
 /** Adds the owner's own link before the closing "Salam,". The model never writes URLs, so none can be invented. */
-export function withLink(body: string, url: string, language: "indonesian" | "english"): string {
+export function withLink(body: string, url: string, language: OutputLanguage): string {
+  // Slice 8 fills this in: the Indonesian line is temporarily the one served for "vietnamese"
   const line = language === "english" ? `More details: ${url}` : `Selengkapnya: ${url}`;
   const m = body.match(/\n+\s*(Salam|Regards|Best regards|Sincerely)[,.]?\s*$/i);
   return m ? `${body.slice(0, m.index).trimEnd()}\n\n${line}\n\n${m[0].trim()}` : `${body.trimEnd()}\n\n${line}`;
@@ -85,7 +87,7 @@ export class MessageWriterService {
     const ai = await this.ai.forWorkspace(workspaceId);
     if (!ai.enabled) throw new ServiceUnavailableException("AI provider is not configured");
     const started = Date.now();
-    const language = lead.campaign.language === "english" ? "english" : "indonesian";
+    const language = toOutputLanguage(lead.campaign.language);
     const profile = await this.prisma.styleProfile.findUnique({ where: { workspaceId } });
     const stats = profile ? (profile.stats as unknown as StyleStats) : undefined;
 
@@ -128,14 +130,14 @@ export class MessageWriterService {
       offerKind,
       retryNote: note,
     });
-    const normOpts = { language: language as "indonesian" | "english", names: [lead.name, business], whatsapp: channel === "whatsapp" };
-    const tidy = (b: { text: string }) => ({ text: channel === "whatsapp" && !followUp ? tidyWhatsappOutreach(b.text) : b.text });
+    const normOpts = { language, names: [lead.name, business], whatsapp: channel === "whatsapp" };
+    const tidy = (b: { text: string }) => ({ text: channel === "whatsapp" && !followUp ? tidyWhatsappOutreach(b.text, language) : b.text });
     let body = tidy(await this.generate(workspaceId, followUp ? "followup" : "outreach", `${lead.id}`, build(), facts.hits.map((h) => h.sourceId), facts.confidence, normOpts));
     // a draft that talks about another kind of business (a rental system for kebaya offered to a costume shop) gets up to two more tries
     const offerTexts = [briefRow?.summary, lead.campaign.yourService];
     const foreignIn = (text: string) => (followUp ? [] : foreignVerticalWords(text, lead, angles, offerTexts));
     const caseStudies = (briefRow?.content as unknown as BriefContent | undefined)?.proof?.customers ?? [];
-    const check = (text: string) => ({ foreign: foreignIn(text), issues: followUp ? [] : outreachProblems(text, { service: offerKind === "service", category: lead.category, caseStudies }) });
+    const check = (text: string) => ({ foreign: foreignIn(text), issues: followUp ? [] : outreachProblems(text, { language, service: offerKind === "service", category: lead.category, caseStudies }) });
     let c = check(body.text);
     const banned = new Set<string>();
     for (let retry = 0; retry < 2 && (c.foreign.length || c.issues.length); retry++) {
@@ -144,22 +146,23 @@ export class MessageWriterService {
       c = check(body.text);
     }
     const foreign = c.foreign;
-    const hint = language === "english" ? OPT_OUT_HINT_EN : OPT_OUT_HINT_ID;
+    const hint = OPT_OUT_HINT[language];
     // Email carries an unsubscribe link in its footer instead of a "reply STOP" line.
-    let emailText = channel === "email" ? neutralHonorific(body.text) : body.text;
+    let emailText = channel === "email" ? neutralHonorific(body.text, language) : body.text;
     if (channel === "email" && !followUp) {
       const acct = await this.prisma.emailAccount.findUnique({ where: { workspaceId }, select: { ctaUrl: true } });
       if (acct?.ctaUrl) emailText = withLink(body.text, acct.ctaUrl, language);
     }
     return {
       text: channel === "email" ? emailText : `${body.text}\n\n${hint}`,
-      risks: [...draftRisks(body.text, facts.hits.map((h) => h.content)), ...(foreign.length ? ["other-business"] : []), ...(c.issues.length ? ["style"] : [])],
+      risks: [...draftRisks(body.text, facts.hits.map((h) => h.content), language), ...(foreign.length ? ["other-business"] : []), ...(c.issues.length ? ["style"] : [])],
       trace: { variant, styled: !!stats, examples: examples.length, knowledge: facts.confidence, model: ai.chatModel, latencyMs: Date.now() - started },
     };
   }
 
   /** One reusable message for a kind of business (not one lead). Takes one draft from the plan allowance. */
-  async generic(workspaceId: string, o: { segment: string; language: "indonesian" | "english"; channel: "whatsapp" | "email"; variant?: OutreachVariant; offer?: string }): Promise<{ text: string; risks: string[] }> {
+  async generic(workspaceId: string, o: { segment: string; language: OutputLanguage; channel: "whatsapp" | "email"; variant?: OutreachVariant; offer?: string }): Promise<{ text: string; risks: string[] }> {
+    const language = toOutputLanguage(o.language);
     const release = await this.limits.reserveDraft(workspaceId);
     try {
       const ai = await this.ai.forWorkspace(workspaceId);
@@ -177,7 +180,7 @@ export class MessageWriterService {
       const build = (note?: string) => buildOutreachMessages({
         businessDescription: business,
         offer: o.offer?.trim() || briefRow?.summary || business,
-        language: o.language,
+        language,
         lead: { name: o.segment, category: o.segment },
         style: stats,
         knowledge: facts.confidence === "none" || kind === "service" ? [] : facts.hits.map((h) => h.content),
@@ -188,17 +191,17 @@ export class MessageWriterService {
         offerKind: kind,
         retryNote: note,
       });
-      const normOpts = { language: o.language, names: [business], whatsapp: o.channel === "whatsapp" };
-      const tidy = (b: { text: string }) => ({ text: o.channel === "whatsapp" ? tidyWhatsappOutreach(b.text) : b.text });
+      const normOpts = { language, names: [business], whatsapp: o.channel === "whatsapp" };
+      const tidy = (b: { text: string }) => ({ text: o.channel === "whatsapp" ? tidyWhatsappOutreach(b.text, language) : b.text });
       let body = tidy(await this.generate(workspaceId, "outreach", `template:${o.segment}`, build(), facts.hits.map((h) => h.sourceId), facts.confidence, normOpts));
       const caseStudies = (briefRow?.content as unknown as BriefContent | undefined)?.proof?.customers ?? [];
-      let issues = outreachProblems(body.text, { service: kind === "service", category: o.segment, caseStudies });
+      let issues = outreachProblems(body.text, { language, service: kind === "service", category: o.segment, caseStudies });
       for (let retry = 0; retry < 2 && issues.length; retry++) {
         body = tidy(await this.generate(workspaceId, "outreach", `template:${o.segment}`, build(issues.join("; ")), facts.hits.map((h) => h.sourceId), facts.confidence, normOpts));
-        issues = outreachProblems(body.text, { service: kind === "service", category: o.segment, caseStudies });
+        issues = outreachProblems(body.text, { language, service: kind === "service", category: o.segment, caseStudies });
       }
-      const text = o.channel === "email" ? neutralHonorific(body.text) : body.text;
-      return { text, risks: [...draftRisks(text, facts.hits.map((h) => h.content)), ...(issues.length ? ["style"] : [])] };
+      const text = o.channel === "email" ? neutralHonorific(body.text, language) : body.text;
+      return { text, risks: [...draftRisks(text, facts.hits.map((h) => h.content), language), ...(issues.length ? ["style"] : [])] };
     } catch (e) {
       await release();
       throw e;
@@ -206,8 +209,8 @@ export class MessageWriterService {
   }
 
   /** Subject line for an email body: specific, plain, no clickbait. Throws when the model cannot produce a usable one. */
-  async subjectFor(workspaceId: string, body: string, language: "indonesian" | "english"): Promise<string> {
-    const id = language === "indonesian";
+  async subjectFor(workspaceId: string, body: string, language: OutputLanguage): Promise<string> {
+    const id = language === "vietnamese"; // Slice 8 fills this in: the Indonesian subject prompt is temporarily keyed "vietnamese"
     const messages: { role: "system" | "user"; content: string }[] = [
       { role: "system", content: [
         `Tulis SATU baris subjek untuk email penjualan berikut, dalam bahasa ${id ? "Indonesia" : "Inggris"}.`,
@@ -228,7 +231,7 @@ export class MessageWriterService {
   /** Reply to a known lead. Same allowance rule as `outreach`. */
   async reply(workspaceId: string, lead: LeadWithCampaign | null, incoming: string, history: string, action: ReplyAction = "answer"): Promise<WrittenMessage | null> {
     if (action === "none") return null;
-    const language = lead?.campaign.language === "english" ? "english" : "indonesian";
+    const language = toOutputLanguage(lead?.campaign.language);
     // fixed wording for thanks and goodbyes: no model, no allowance used, nothing to go wrong
     const fixed = templateReply(action, language);
     if (fixed) return { text: fixed, risks: [], trace: { styled: false, examples: 0, knowledge: "none", model: "template", latencyMs: 0 } };
@@ -256,7 +259,7 @@ export class MessageWriterService {
     } catch (e) {
       this.logger.warn(`Style examples skipped: ${(e as Error).message}`);
     }
-    const language = lead?.campaign.language === "english" ? "english" : "indonesian";
+    const language = toOutputLanguage(lead?.campaign.language);
     const facts = await this.knowledge.search(workspaceId, topicQuery);
     const knownFacts = facts.confidence === "none" ? [] : facts.hits.map((h) => h.content);
     const alreadyIntroduced = /\b(saya|kami)\s+dari\b/i.test(history);
@@ -281,8 +284,8 @@ export class MessageWriterService {
     let problems: string[] = [];
     for (let attempt = 0; attempt < 2; attempt++) {
       const body = await this.generate(workspaceId, "reply", incoming, build(attempt ? problems.join(", ") : undefined), facts.hits.map((h) => h.sourceId), facts.confidence, { language: language === "english" ? "english" : "auto", names, whatsapp: true }, pickReply);
-      text = neutralHonorificChat(lead ? removeEmoji(body.text) : body.text);
-      problems = checkReply(text, { alreadyIntroduced, knownText: [history, ...knownFacts].join("\n") });
+      text = neutralHonorificChat(lead ? removeEmoji(body.text) : body.text, language);
+      problems = checkReply(text, { alreadyIntroduced, knownText: [history, ...knownFacts].join("\n"), language });
       // a second reading catches what the rules cannot: a cut-off sentence, an answer to another question, an invented price
       if (problems.length === 0) {
         const verdict = await this.judgeReply(workspaceId, { history, incoming, draft: text, facts: knownFacts });
@@ -290,7 +293,7 @@ export class MessageWriterService {
       }
       if (problems.length === 0) break;
     }
-    const risks = draftRisks(text, knownFacts);
+    const risks = draftRisks(text, knownFacts, language);
     // two failed attempts: show safe wording instead of a reply that makes no sense, and say so
     if (problems.length > 0) { text = fallbackReply(action, language, offerKind); risks.push("fallback"); }
     return { text, risks, trace: { styled: true, examples: examples.length, knowledge: facts.confidence, model: ai.chatModel, latencyMs: Date.now() - started } };
@@ -307,7 +310,7 @@ export class MessageWriterService {
     }
   }
 
-  private async generate(workspaceId: string, kind: string, input: string, messages: { role: "system" | "user"; content: string }[], sourceIds: string[], confidence: string, norm: { language: "indonesian" | "english" | "auto"; names: string[]; whatsapp?: boolean }, pick: (raw: string) => string = (raw) => raw) {
+  private async generate(workspaceId: string, kind: string, input: string, messages: { role: "system" | "user"; content: string }[], sourceIds: string[], confidence: string, norm: { language: OutputLanguage | "auto"; names: string[]; whatsapp?: boolean }, pick: (raw: string) => string = (raw) => raw) {
     const ai = await this.ai.forWorkspace(workspaceId);
     const started = Date.now();
     let output = "";

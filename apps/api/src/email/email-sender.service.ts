@@ -5,7 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { decide, nextGapMs, startOfLocalDay } from "../messaging/send-policy";
 import { decryptSecret } from "../settings/encryption.util";
 import { createTransport, friendlySmtpError } from "./email-transport";
-import { authFailure, buildFooter, headerLine, isPermanentSmtpError, isPublicUnsubscribeBase, signUnsubscribe, unsubscribeBase } from "./email-utils";
+import { authFailure, buildFooter, emailLanguage, headerLine, isPermanentSmtpError, isPublicUnsubscribeBase, signUnsubscribe, unsubscribeBase } from "./email-utils";
 
 const TICK_MS = 20_000;
 const MAX_ATTEMPTS = 3;
@@ -79,7 +79,7 @@ export class EmailSenderService implements OnModuleInit, OnModuleDestroy {
         await this.prisma.outboundMessage.update({ where: { id: next.id }, data: { status: "cancelled", error: "Recipient opted out" } });
         return;
       }
-      const language = (next.context as { language?: string } | null)?.language === "english" ? "english" : "indonesian";
+      const language = emailLanguage(next.context);
       const url = `${this.publicBase()}/unsubscribe/${signUnsubscribe(a.workspaceId, to, this.config.getOrThrow<string>("JWT_SECRET"))}`;
       const transport = await createTransport(a, decryptSecret(a.passwordEnc, this.config.getOrThrow<string>("ENCRYPTION_KEY")));
       let info;

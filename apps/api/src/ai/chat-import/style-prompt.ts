@@ -1,5 +1,6 @@
 import type { StyleStats, ReplyPair } from "./style-stats";
 import { normalizeDraft } from "../orthography";
+import { DEFAULT_OUTPUT_LANGUAGE, type OutputLanguage } from "../../common/language";
 
 export function cosine(a: number[], b: number[]): number {
   let dot = 0, na = 0, nb = 0;
@@ -32,7 +33,7 @@ const SPELLING_RULE_EN =
   "SPELLING: use standard written English. Start sentences and names with a capital letter, end every sentence with punctuation, write words in full (no chat abbreviations like \"u\", \"r\", \"tbh\"). Chat habits from examples (lowercase, no punctuation) must NOT be copied — imitate only length, word choice, warmth and emoji.";
 
 /** Human-readable description of measured writing habits, fed to the model as a style guide. */
-export function describeStyle(s: StyleStats, lang: "indonesian" | "english" = "indonesian"): string {
+export function describeStyle(s: StyleStats, lang: OutputLanguage = DEFAULT_OUTPUT_LANGUAGE): string {
   const en = lang === "english";
   const lines = en
     ? [
@@ -146,7 +147,7 @@ export interface OutreachPromptInput {
   businessDescription: string;
   /** What the owner offers to this lead. */
   offer: string;
-  language: "indonesian" | "english";
+  language: OutputLanguage;
   lead: LeadFacts;
   /** Absent when the owner has not trained a style: the draft is then plain and neutral. */
   style?: StyleStats;
@@ -299,7 +300,8 @@ function serviceEmail(businessDescription: string, en = false): string[] {
 
 /** Builds the prompt for a first-contact message or a follow-up, written in the owner's voice when a style exists. */
 export function buildOutreachMessages(input: OutreachPromptInput): { role: "system" | "user"; content: string }[] {
-  const id = input.language === "indonesian";
+  // Slice 8 fills this in: every Indonesian text branch below is temporarily keyed "vietnamese" (`id` means "not English")
+  const id = input.language === "vietnamese";
   const fu = input.followUp;
   const email = input.channel === "email";
   const opening = id ? OPENING : OPENING_EN;

@@ -7,6 +7,8 @@
  * terminal punctuation, a comma before a vocative ("Ya, Kak"), and "Anda" capitalized.
  */
 
+import type { OutputLanguage } from "../common/language";
+
 const INDONESIAN_HINTS = /\b(yang|dan|untuk|saya|kami|kak|ya|apakah|boleh|dengan|anda|ini|itu|tidak|bisa|ada|sudah|belum|dari|di|ke|pak|bu|mas|mbak)\b/gi;
 
 /** A rough check, enough to pick the right rule set for text of unknown language. */
@@ -79,16 +81,17 @@ function indonesianRules(text: string): string {
 }
 
 export interface NormalizeOptions {
-  /** "indonesian" | "english" | "auto" (default: detect). */
-  language?: "indonesian" | "english" | "auto";
+  /** An output language, or "auto" (default: detect). */
+  language?: OutputLanguage | "auto";
   /** Proper names (business, lead, owner) restored to their exact spelling wherever they appear in any casing. */
   names?: string[];
 }
 
 export function normalizeDraft(raw: string, opts: NormalizeOptions = {}): string {
   let out = raw.replace(/[ \t]+/g, " ").replace(/ +([,.!?;:])/g, "$1").replace(/[ \t]+\n/g, "\n").trim();
-  const lang = opts.language && opts.language !== "auto" ? opts.language : looksIndonesian(out) ? "indonesian" : "english";
-  if (lang === "indonesian") out = indonesianRules(out);
+  // Slice 6 fills this in: the Indonesian rules are temporarily keyed "vietnamese"
+  const lang: OutputLanguage = opts.language && opts.language !== "auto" ? opts.language : looksIndonesian(out) ? "vietnamese" : "english";
+  if (lang === "vietnamese") out = indonesianRules(out);
   // list items and quotes are fragments, not sentences: no full stop is added to them
   out = out.split("\n").map((l) => (/^(- |\d{1,2}\. |> )/.test(l.trimStart()) ? l : ensureTerminalPunctuation(l, lang === "english"))).join("\n");
   out = capitalizeSentences(out);

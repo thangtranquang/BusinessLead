@@ -1,3 +1,5 @@
+import type { OutputLanguage } from "../common/language";
+
 /** WhatsApp and plain-text email show markdown symbols literally ("_booking_"), so they never belong in a draft. */
 export function stripMarkdown(text: string): string {
   return text
@@ -14,11 +16,13 @@ export function removeEmoji(text: string): string {
   return text.replace(/[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\u200D\uFE0F]/gu, "").replace(/[ \t]+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
 }
 
-export function neutralHonorificChat(text: string): string {
+// `language` is accepted by the three honorific helpers below so that Slice 5 can give Vietnamese its own behaviour without
+// touching any call site; until then they behave as before for every language (Slice 5 fills this in).
+export function neutralHonorificChat(text: string, language: OutputLanguage): string {
   return text.replace(/\b(Mbak|Mas|Bapak|Ibu|Pak|Bu)\b(?!\s+[A-Z])/g, "Kak");
 }
 
-export function neutralHonorific(text: string): string {
+export function neutralHonorific(text: string, language: OutputLanguage): string {
   return text.replace(/\b(Bapak|Ibu|Pak|Bu)\b(?!\s+[A-Z])/g, "Anda");
 }
 
@@ -26,7 +30,7 @@ export function neutralHonorific(text: string): string {
  * The first WhatsApp message goes to someone whose name and gender are unknown: "Kak" for the greeting, never Bapak/Ibu.
  * Done in code because a model writes "Halo," alone or "Jika Bapak/Ibu berkenan" now and then whatever the prompt says.
  */
-export function tidyWhatsappOutreach(text: string): string {
+export function tidyWhatsappOutreach(text: string, language: OutputLanguage): string {
   return text
     .replace(/\b(Bapak\s*\/\s*Ibu|Ibu\s*\/\s*Bapak|Bapak|Ibu|Pak|Bu|Mbak|Mas)\b(?!\s+[A-Z])/g, "Kakak")
     .replace(/\bAnda(nya)?\b/g, "Kakak") // one way of addressing them: "Kak" in the greeting and "Kakak" after it, never "Anda"

@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AiClientService } from "./ai-client.service";
 import { SECURITY_RULE, clip } from "./chat-import/style-prompt";
 import type { FitLevel, FitVerdict } from "./lead-intelligence.service";
+import { LANGUAGE_LABEL, toOutputLanguage, type OutputLanguage } from "../common/language";
 
 const BATCH = 20;
 const MAX_LEADS = 200;
@@ -13,8 +14,8 @@ export interface FitCandidate {
 }
 
 /** One line per lead: the business name and its real Google Maps category are both evidence. */
-export function buildFitMessages(input: { offer: string; targets: string; language: "indonesian" | "english"; leads: FitCandidate[] }) {
-  const lang = input.language === "english" ? "English" : "Bahasa Indonesia";
+export function buildFitMessages(input: { offer: string; targets: string; language: OutputLanguage; leads: FitCandidate[] }) {
+  const lang = LANGUAGE_LABEL[toOutputLanguage(input.language)];
   return [
     {
       role: "system" as const,
@@ -69,7 +70,7 @@ export class FitService {
 
   constructor(private readonly prisma: PrismaService, private readonly ai: AiClientService) {}
 
-  async assess(workspaceId: string, leads: FitCandidate[], offer: string, language: "indonesian" | "english"): Promise<(FitVerdict | undefined)[]> {
+  async assess(workspaceId: string, leads: FitCandidate[], offer: string, language: OutputLanguage): Promise<(FitVerdict | undefined)[]> {
     const none = leads.map(() => undefined);
     const ai = await this.ai.forWorkspace(workspaceId);
     if (!ai.enabled || leads.length === 0 || !offer.trim()) return none;

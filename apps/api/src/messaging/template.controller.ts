@@ -2,24 +2,25 @@ import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import { IsOutputLanguage, type OutputLanguage } from "../common/language";
 import { JwtGuard } from "../auth/jwt.guard";
 import { WorkspaceId } from "../auth/current-workspace.decorator";
 import { MAX_EMAIL_BODY } from "./messaging.service";
 import { MAX_TEMPLATE_LEADS, TemplateService } from "./template.service";
 
-class GenerateTemplateDto {
+export class GenerateTemplateDto {
   @IsString() @MinLength(2) @MaxLength(80) segment!: string;
   @IsIn(["whatsapp", "email"]) channel!: "whatsapp" | "email";
-  @IsOptional() @IsIn(["indonesian", "english"]) language?: "indonesian" | "english";
+  @IsOutputLanguage() language?: OutputLanguage;
   @IsOptional() @IsIn(["pain", "observation", "outcome"]) variant?: "pain" | "observation" | "outcome";
   @IsOptional() @IsString() @MaxLength(600) offer?: string;
 }
-class ApplyTemplateDto {
+export class ApplyTemplateDto {
   @IsIn(["whatsapp", "email"]) channel!: "whatsapp" | "email";
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(MAX_TEMPLATE_LEADS) @IsString({ each: true }) leadIds!: string[];
   @IsString() @MinLength(1) @MaxLength(MAX_EMAIL_BODY) body!: string;
   @IsOptional() @IsString() @MaxLength(200) subject?: string;
-  @IsOptional() @IsIn(["indonesian", "english"]) language?: "indonesian" | "english";
+  @IsOutputLanguage() language?: OutputLanguage;
   @IsOptional() @IsString() @MaxLength(64) attachmentId?: string;
   @IsOptional() @IsBoolean() linkPreview?: boolean;
 }

@@ -39,12 +39,12 @@ test("one unbroken block is split into greeting, body and closing", () => {
 import { tidyWhatsappOutreach } from "./plain-text";
 
 test("the first message greets with Kak and never says Bapak/Ibu", () => {
-  assert.equal(tidyWhatsappOutreach("Halo,\n\nPerkenalkan saya dari X."), "Halo, Kak.\n\nPerkenalkan saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Halo, Kak. Jika Bapak/Ibu berkenan, kami siap."), "Halo, Kak. Jika Kakak berkenan, kami siap.");
-  assert.equal(tidyWhatsappOutreach("Halo Perkenalkan saya dari X."), "Halo, Kak. Perkenalkan saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Halo, Kak. Saya dari X."), "Halo, Kak. Saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Halo Bapak/Ibu,\n\nSaya dari X."), "Halo, Kak.\n\nSaya dari X.");
-  assert.equal(tidyWhatsappOutreach("Hai Kakak, saya dari X."), "Halo, Kak. saya dari X.");
-  assert.equal(tidyWhatsappOutreach("Pak Budi, selamat siang."), "Pak Budi, selamat siang.");
-  assert.equal(tidyWhatsappOutreach("Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?"), "Halo, Kak. Apakah Kakak ingin berdiskusi tentang bisnis Kakak?");
+  assert.equal(tidyWhatsappOutreach("Halo,\n\nPerkenalkan saya dari X.", "vietnamese"), "Halo, Kak.\n\nPerkenalkan saya dari X.");
+  assert.equal(tidyWhatsappOutreach("Halo, Kak. Jika Bapak/Ibu berkenan, kami siap.", "vietnamese"), "Halo, Kak. Jika Kakak berkenan, kami siap.");
+  assert.equal(tidyWhatsappOutreach("Halo Perkenalkan saya dari X.", "vietnamese"), "Halo, Kak. Perkenalkan saya dari X.");
+  assert.equal(tidyWhatsappOutreach("Halo, Kak. Saya dari X.", "vietnamese"), "Halo, Kak. Saya dari X.");
+  assert.equal(tidyWhatsappOutreach("Halo Bapak/Ibu,\n\nSaya dari X.", "vietnamese"), "Halo, Kak.\n\nSaya dari X.");
+  assert.equal(tidyWhatsappOutreach("Hai Kakak, saya dari X.", "vietnamese"), "Halo, Kak. saya dari X.");
+  assert.equal(tidyWhatsappOutreach("Pak Budi, selamat siang.", "vietnamese"), "Pak Budi, selamat siang.");
+  assert.equal(tidyWhatsappOutreach("Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?", "vietnamese"), "Halo, Kak. Apakah Kakak ingin berdiskusi tentang bisnis Kakak?");
 });

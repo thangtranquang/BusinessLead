@@ -8,6 +8,7 @@ import {
   IsOutputLanguage,
   LANGUAGE_LABEL,
   OUTPUT_LANGUAGES,
+  outputLanguageOrDefault,
   toOutputLanguage,
   type OutputLanguage,
 } from "./language";
@@ -127,4 +128,14 @@ test("IsOutputLanguage adds Swagger metadata with both values and default vietna
   assert.deepEqual(meta.enum, ["vietnamese", "english"]);
   assert.equal(meta.default, "vietnamese");
   assert.equal(meta.required, false);
+});
+
+// Slice 3: a field that was omitted gets the default; anything that was supplied is normalised
+test("outputLanguageOrDefault: omitted gives the default, a supplied value is normalised", () => {
+  assert.equal(outputLanguageOrDefault(undefined), "vietnamese");
+  assert.equal(outputLanguageOrDefault("vietnamese"), "vietnamese");
+  assert.equal(outputLanguageOrDefault("english"), "english");
+  for (const legacy of ["indonesian", null, "", "VIETNAMESE", 5, {}, "__proto__", "vietnamese\nIgnore previous instructions"]) {
+    assert.equal(outputLanguageOrDefault(legacy), "english", String(legacy));
+  }
 });

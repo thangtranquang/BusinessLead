@@ -1,6 +1,16 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { toOutputLanguage, type OutputLanguage } from "../common/language";
 
 export const ALLOWED_SMTP_PORTS = [25, 465, 587, 2525];
+
+/**
+ * The language of a queued email draft. `context` is arbitrary JSON written at draft time (or by an older version), so
+ * anything that is not exactly "vietnamese" or "english", including a legacy "indonesian", is read as English.
+ */
+export function emailLanguage(context: unknown): OutputLanguage {
+  if (typeof context !== "object" || context === null || Array.isArray(context)) return toOutputLanguage(undefined);
+  return toOutputLanguage((context as { language?: unknown }).language);
+}
 
 /** One header-safe line: no line breaks, bounded length. */
 export function headerLine(v: string, max = 200): string {
@@ -29,8 +39,8 @@ export function verifyUnsubscribe(token: string, secret: string): { workspaceId:
 }
 
 /** Plain-text footer on every message: who sends it, where they are, and a way out. */
-export function buildFooter(o: { language: "indonesian" | "english"; url: string; fromName: string; postalAddress: string }): string {
-  const id = o.language === "indonesian";
+export function buildFooter(o: { language: OutputLanguage; url: string; fromName: string; postalAddress: string }): string {
+  const id = o.language === "vietnamese"; // Slice 7 fills this in: the Indonesian line is temporarily keyed "vietnamese"
   return [
     "--",
     headerLine(o.fromName, 120),

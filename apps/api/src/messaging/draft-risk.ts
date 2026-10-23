@@ -3,6 +3,8 @@
  * A draft that introduces links, contact details, prices, discounts or bank details that the knowledge base does not contain
  * is not blocked (a person still reviews it) but it is flagged so the reviewer looks twice.
  */
+import type { OutputLanguage } from "../common/language";
+
 const RISKY: [RegExp, string][] = [
   [/https?:\/\/|www\./i, "link"],
   [/[\w.+-]+@[\w-]+\.[\w.]+/, "email"],
@@ -15,7 +17,8 @@ const RISKY: [RegExp, string][] = [
   [/\b(Bapak|Ibu|Pak|Bu)\b(?!\s+[A-Z])/, "honorific"],
 ];
 
-export function draftRisks(draft: string, knowledge: string[]): string[] {
+// `language` is part of the signature now; Vietnamese rules arrive in Slice 5 (the Indonesian rules apply to every language until then).
+export function draftRisks(draft: string, knowledge: string[], language: OutputLanguage): string[] {
   const known = knowledge.join("\n").toLowerCase();
   const found: string[] = [];
   for (const [re, label] of RISKY) {

@@ -8,13 +8,16 @@ const PRODUCT_PITCH = /\b(demo|contoh\s+tampilan|uji\s+coba|coba\s+gratis|aplika
 const JARGON = /\b(di\s+produksi|engineering|RAG|asisten\s+dokumen|pipeline|stack)\b/i;
 const INTRO = /\b(perkenalkan|saya\s+dari|kami\s+dari|saya\s+[a-z]+\s+dari)\b/i;
 
+import type { OutputLanguage } from "../common/language";
+
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * `caseStudies`: names of clients and case studies in the owner's own brief. A first message to a stranger must not name them, unless the
  * stranger is that business (the name is in their own name or category).
  */
-export function outreachProblems(text: string, o: { service: boolean; category?: string | null; caseStudies?: string[] }): string[] {
+// `language` is part of the options now; Vietnamese rules arrive in Slice 6 (the Indonesian rules apply to every language until then).
+export function outreachProblems(text: string, o: { language: OutputLanguage; service: boolean; category?: string | null; caseStudies?: string[] }): string[] {
   const problems: string[] = [];
   const t = text.trim();
   if (t.length < 60) problems.push("terlalu pendek");

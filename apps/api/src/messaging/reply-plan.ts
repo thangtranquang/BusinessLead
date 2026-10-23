@@ -1,4 +1,5 @@
 import type { ReplyIntent } from "./reply-intent";
+import type { OutputLanguage } from "../common/language";
 
 /**
  * What a reply should DO, decided by rules before any model writes a word. The model only phrases it.
@@ -25,8 +26,8 @@ export function planReplyAction(intent: ReplyIntent, text: string): ReplyAction 
 }
 
 /** Fixed wording for the actions that need no facts. Polite, humble, no emoji, no guessed honorific. */
-export function templateReply(action: ReplyAction, language: "indonesian" | "english"): string | null {
-  const id = language === "indonesian";
+export function templateReply(action: ReplyAction, language: OutputLanguage): string | null {
+  const id = language === "vietnamese"; // Slice 5 fills this in: the Indonesian wording is temporarily keyed "vietnamese"
   switch (action) {
     case "thanks_referral":
       return id ? "Baik, Kak. Terima kasih banyak, akan saya hubungi nomor tersebut." : "Thank you very much. I will contact that number.";
@@ -44,8 +45,8 @@ export function templateReply(action: ReplyAction, language: "indonesian" | "eng
 }
 
 /** Safe wording when the model could not produce a reply that passes the checks. A person still reviews it. */
-export function fallbackReply(action: ReplyAction, language: "indonesian" | "english", kind: "product" | "service" = "product"): string {
-  const id = language === "indonesian";
+export function fallbackReply(action: ReplyAction, language: OutputLanguage, kind: "product" | "service" = "product"): string {
+  const id = language === "vietnamese"; // Slice 5 fills this in: the Indonesian wording is temporarily keyed "vietnamese"
   if (action === "next_step" && kind === "service") return id ? "Terima kasih sudah membalas, Kak. Boleh saya tahu kebutuhan atau kendala apa yang ingin dibereskan di usaha Kakak? Nanti saya bantu jelaskan yang paling cocok." : "Thank you for replying. May I ask what need or problem you would like to solve in your business? I will then explain what fits best.";
   if (action === "next_step") return id ? "Terima kasih sudah membalas, Kak. Boleh saya kirimkan contoh tampilannya, atau saya jelaskan singkat lewat demo?" : "Thank you for replying. May I send you an example, or explain briefly in a short demo?";
   return id ? "Terima kasih sudah membalas, Kak. Saya kirimkan rincian yang Kakak butuhkan ya. Mohon beri tahu bagian mana yang ingin diketahui lebih dulu." : "Thank you for replying. I will send the details you need. Please tell me which part you would like to know first.";
@@ -57,7 +58,8 @@ const META = /\b(bukan\s+(pelanggan|penyewa|calon\s+pelanggan)|peran\s+(saya|kit
 const INTRO = /\b(saya|kami)\s+dari\b|\bperkenalkan\b/i;
 
 /** Why a drafted reply should not be shown as is. Empty means it passes. */
-export function checkReply(text: string, o: { alreadyIntroduced: boolean; knownText: string }): string[] {
+// `o.language` is part of the options now; Vietnamese rules arrive in Slice 5 (the Indonesian rules apply to every language until then).
+export function checkReply(text: string, o: { alreadyIntroduced: boolean; knownText: string; language: OutputLanguage }): string[] {
   const problems: string[] = [];
   const t = text.trim();
   if (t.length < 8) problems.push("too short");

@@ -25,8 +25,8 @@ test("headerLine removes line breaks so a subject cannot inject headers", () => 
 });
 
 test("footer carries the sender, the address and the unsubscribe link", () => {
-  const f = buildFooter({ language: "indonesian", url: "https://x.id/u/abc", fromName: "Asiifdev", postalAddress: "Jl. Contoh 1, Boyolali" });
-  assert.match(f, /Asiifdev/);
+  const f = buildFooter({ language: "vietnamese", url: "https://x.id/u/abc", fromName: "Công ty Mẫu", postalAddress: "Jl. Contoh 1, Boyolali" });
+  assert.match(f, /Công ty Mẫu/);
   assert.match(f, /Jl\. Contoh 1, Boyolali/);
   assert.match(f, /https:\/\/x\.id\/u\/abc/);
   assert.match(buildFooter({ language: "english", url: "u", fromName: "A", postalAddress: "B" }), /Don't want emails/);

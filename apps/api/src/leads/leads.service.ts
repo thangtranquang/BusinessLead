@@ -2,9 +2,20 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type { Prisma } from "@prisma/client";
 import { normalizePhone } from "../messaging/phone";
 import { PrismaService } from "../prisma/prisma.service";
+import { toOutputLanguage, type OutputLanguage } from "../common/language";
 import { UpdateCrmDto } from "./dto/update-crm.dto";
 
 const DEFAULT_WORKSPACE_ID = "default-workspace";
+
+/** Default name and log note of a contact that someone passed us, in the language of the campaign it belongs to (FR-25.5). */
+export const REFERRAL_NAME: Readonly<Record<OutputLanguage, (from: string) => string>> = Object.freeze({
+  vietnamese: (from) => `Liên hệ từ ${from}`,
+  english: (from) => `Contact from ${from}`,
+});
+export const REFERRAL_NOTE: Readonly<Record<OutputLanguage, (from: string) => string>> = Object.freeze({
+  vietnamese: (from) => `Từ ${from}`,
+  english: (from) => `From ${from}`,
+});
 
 export interface LeadFilter {
   campaignId?: string;
@@ -115,8 +126,9 @@ export class LeadsService {
    * The same number is never added twice in one workspace.
    */
   async createFromReferral(workspaceId: string, fromLeadId: string, input: { name?: string; phone: string }) {
-    const from = await this.prisma.lead.findFirst({ where: { id: fromLeadId, workspaceId }, select: { id: true, name: true, category: true, campaignId: true } });
+    const from = await this.prisma.lead.findFirst({ where: { id: fromLeadId, workspaceId }, select: { id: true, name: true, category: true, campaignId: true, campaign: { select: { language: true } } } });
     if (!from) throw new NotFoundException(`Lead ${fromLeadId} not found`);
+    const language = toOutputLanguage(from.campaign?.language);
     const account = await this.prisma.whatsappAccount.findUnique({ where: { workspaceId }, select: { defaultCountryCode: true } });
     const phoneE164 = normalizePhone(input.phone, account?.defaultCountryCode ?? "62");
     if (!phoneE164) throw new BadRequestException("That phone number is not valid");
@@ -124,12 +136,12 @@ export class LeadsService {
     if (existing) return { created: false, leadId: existing.id };
     const lead = await this.prisma.lead.create({
       data: {
-        workspaceId, campaignId: from.campaignId, name: (input.name?.trim() || `Kontak dari ${from.name}`).slice(0, 160), phone: input.phone.trim().slice(0, 40), phoneE164,
+        workspaceId, campaignId: from.campaignId, name: (input.name?.trim() || REFERRAL_NAME[language](from.name)).slice(0, 160), phone: input.phone.trim().slice(0, 40), phoneE164,
         category: from.category, source: "referral", priority: "MEDIUM", crmStatus: "new", aiAnalysis: { referral: { from: from.id } },
       },
       select: { id: true },
     });
-    await this.prisma.leadActivity.create({ data: { leadId: lead.id, type: "referral_added", note: `Dari ${from.name}` } });
+    await this.prisma.leadActivity.create({ data: { leadId: lead.id, type: "referral_added", note: REFERRAL_NOTE[language](from.name) } });
     return { created: true, leadId: lead.id };
   }
 

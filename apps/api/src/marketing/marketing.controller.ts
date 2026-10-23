@@ -2,10 +2,11 @@ import { Body, Controller, Delete, Get, Param, Post, Put, UploadedFiles, UseGuar
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import { ArrayMaxSize, IsArray, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import { ArrayMaxSize, IsArray, IsObject, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import { memoryStorage } from "multer";
 import { JwtGuard } from "../auth/jwt.guard";
 import { WorkspaceId } from "../auth/current-workspace.decorator";
+import { IsOutputLanguage, type OutputLanguage } from "../common/language";
 import { BriefService } from "./brief.service";
 import type { BriefContent } from "./brief-schema";
 
@@ -17,12 +18,12 @@ class TextDto {
   @IsString() @MinLength(1) @MaxLength(120) title!: string;
   @IsString() @MinLength(30) @MaxLength(200_000) content!: string;
 }
-class GenerateDto {
+export class GenerateDto {
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) sourceIds?: string[];
   @IsOptional() @IsString() @MaxLength(3000) notes?: string;
   @IsOptional() @IsString() @MaxLength(120) industry?: string;
   @IsOptional() @IsString() @MaxLength(120) location?: string;
-  @IsOptional() @IsIn(["indonesian", "english"]) language?: "indonesian" | "english";
+  @IsOutputLanguage() language?: OutputLanguage;
 }
 class SaveDto {
   @IsString() @MinLength(10) @MaxLength(600) summary!: string;

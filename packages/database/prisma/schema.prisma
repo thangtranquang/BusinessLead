@@ -131,7 +131,7 @@ model Campaign {
   maxResults    Int       @default(20)
   yourService   String
   contentStyle  String    @default("balanced")
-  language      String    @default("indonesian")
+  language      String    @default("vietnamese")
   status        String    @default("draft")
   progress      Int       @default(0)
   error         String?
@@ -561,7 +561,7 @@ model MessageOptOut {
 model MarketingBrief {
   id        String   @id @default(cuid())
   version   Int      @default(1)
-  language  String   @default("indonesian")
+  language  String   @default("vietnamese")
   summary   String // short service/product description used to fill campaigns
   content   Json // structured sections, see apps/api/src/marketing/brief-schema.ts
   sourceIds String[]

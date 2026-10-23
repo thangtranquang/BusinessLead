@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { AiClientService, WorkspaceAi } from "./ai-client.service";
+import { LANGUAGE_LABEL, toOutputLanguage } from "../common/language";
 
 export interface GenerateContentInput {
   businessName: string;
@@ -42,7 +43,7 @@ export class MarketingAiService {
   }
 
   private async callModel(ai: WorkspaceAi, input: GenerateContentInput): Promise<MarketingContent> {
-    const isIndonesian = input.language === "indonesian";
+    const language = toOutputLanguage(input.language); // the job or row may carry a legacy value
     const styleCues: Record<string, string> = {
       professional: "formal, professional, direct",
       friendly: "warm, friendly, approachable",
@@ -60,7 +61,7 @@ Rating: ${input.rating || "unknown"} stars
 Has Website: ${input.hasWebsite ? "yes" : "no"}
 Your Service/Product: ${input.yourService}
 Tone: ${style}
-Language: ${isIndonesian ? "Indonesian (Bahasa Indonesia)" : "English"}
+Language: ${LANGUAGE_LABEL[language]}
 AI Score: ${input.score}/100
 
 Generate: email (subject + body, 100-150 words), LinkedIn connection note (under 280 chars), cold call opening (2-3 sentences).

@@ -21,6 +21,14 @@ export function toOutputLanguage(value: unknown): OutputLanguage {
 }
 
 /**
+ * For a value that came in with a request: omitted means the default (Vietnamese, FR-18); anything that was supplied is
+ * normalised, so a null, a legacy "indonesian" or hostile text reads as English and is never written or prompted raw.
+ */
+export function outputLanguageOrDefault(value: unknown): OutputLanguage {
+  return value === undefined ? DEFAULT_OUTPUT_LANGUAGE : toOutputLanguage(value);
+}
+
+/**
  * The only way a language name enters a prompt. Always index it with a value that went through `toOutputLanguage`,
  * never with raw input: the table is frozen and has exactly two own keys, so the lookup cannot reach a prototype member.
  */

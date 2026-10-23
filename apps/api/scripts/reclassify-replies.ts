@@ -6,7 +6,7 @@
  * Run: DATABASE_URL=... npx tsx scripts/reclassify-replies.ts [--apply]   (dry run without --apply)
  */
 import { PrismaClient } from "@prisma/client";
-import { OPT_OUT_HINT_EN, OPT_OUT_HINT_ID } from "../src/messaging/opt-out";
+import { OPT_OUT_HINT_EN, OPT_OUT_HINT_ID_LEGACY, OPT_OUT_HINT_VI } from "../src/messaging/opt-out";
 import { classifyReply, planReplyOutcome } from "../src/messaging/reply-intent";
 
 const WEAK = new Set(["other", "auto_reply", null]);
@@ -23,7 +23,7 @@ async function main() {
     for (const m of inbound) {
       if (!WEAK.has(m.intent)) continue;
       const before = out.filter((o) => o.sentAt && o.sentAt <= m.receivedAt).pop();
-      const lastMine = (before?.body ?? "").replace(OPT_OUT_HINT_ID, "").replace(OPT_OUT_HINT_EN, "").trim();
+      const lastMine = (before?.body ?? "").replace(OPT_OUT_HINT_ID_LEGACY, "").replace(OPT_OUT_HINT_EN, "").replace(OPT_OUT_HINT_VI, "").trim();
       const intent = classifyReply(m.body, { lastMine });
       if (intent === "interested" || intent === "meeting") best = { id: m.id, intent, body: m.body };
     }

@@ -7,7 +7,8 @@ import { maybePreview } from "./link-preview";
 import { isValidEmail } from "./email-address";
 import { MessageWriterService } from "./message-writer.service";
 import { MAX_BODY, MAX_EMAIL_BODY } from "./messaging.service";
-import { OPT_OUT_HINT_EN, OPT_OUT_HINT_ID } from "./opt-out";
+import { OPT_OUT_HINT } from "./opt-out";
+import { outputLanguageOrDefault, type OutputLanguage } from "../common/language";
 import { normalizePhone } from "./phone";
 import type { OutreachVariant } from "../ai/chat-import/style-prompt";
 
@@ -60,21 +61,21 @@ export class TemplateService {
   }
 
   /** The AI writes ONE generic message for a kind of business. Consumes one draft from the plan. */
-  async generate(workspaceId: string, o: { segment: string; channel: Channel; language?: "indonesian" | "english"; variant?: OutreachVariant; offer?: string }) {
+  async generate(workspaceId: string, o: { segment: string; channel: Channel; language?: OutputLanguage; variant?: OutreachVariant; offer?: string }) {
     const segment = o.segment.trim();
     if (!segment) throw new BadRequestException("Choose or type the kind of business first");
-    const language = o.language === "english" ? "english" : "indonesian";
+    const language = outputLanguageOrDefault(o.language);
     const w = await this.writer.generic(workspaceId, { segment, language, channel: o.channel, variant: o.variant, offer: o.offer });
     const subject = o.channel === "email" ? await this.writer.subjectFor(workspaceId, w.text, language) : undefined;
     return { body: w.text, subject, risks: w.risks };
   }
 
   /** Turns the template into one draft per selected lead. Leads that cannot or should not be messaged are counted, not failed. */
-  async apply(workspaceId: string, o: { channel: Channel; leadIds: string[]; body: string; subject?: string; language?: "indonesian" | "english"; attachmentId?: string; linkPreview?: boolean }) {
+  async apply(workspaceId: string, o: { channel: Channel; leadIds: string[]; body: string; subject?: string; language?: OutputLanguage; attachmentId?: string; linkPreview?: boolean }) {
     const body = o.body.trim();
-    const language = o.language === "english" ? "english" : "indonesian";
+    const language = outputLanguageOrDefault(o.language);
     if (!body) throw new BadRequestException("The message is empty");
-    const hint = language === "english" ? OPT_OUT_HINT_EN : OPT_OUT_HINT_ID;
+    const hint = OPT_OUT_HINT[language];
     const max = o.channel === "email" ? MAX_EMAIL_BODY : MAX_BODY - hint.length - 2;
     if (body.length > max) throw new BadRequestException(`The message is longer than ${max} characters`);
     const subject = o.subject?.trim();

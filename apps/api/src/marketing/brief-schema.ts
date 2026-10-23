@@ -1,4 +1,5 @@
 import { clip } from "../ai/chat-import/style-prompt";
+import { DEFAULT_OUTPUT_LANGUAGE, toOutputLanguage, type OutputLanguage } from "../common/language";
 
 /**
  * The Marketing Brief follows the structure of the `product-marketing` skill (overview, audience, problems,
@@ -26,7 +27,7 @@ export interface CampaignSuggestion {
   location: string;
   searchQueries: string[];
   contentStyle: "professional" | "friendly" | "balanced" | "casual";
-  language: "indonesian" | "english";
+  language: OutputLanguage;
 }
 
 export interface ParsedBrief {
@@ -163,7 +164,7 @@ export function mergeRaw(parts: unknown[]): Record<string, unknown> {
 }
 
 /** Coerces anything the model returned into the brief shape, with length caps. Never throws on missing fields. */
-export function coerceBrief(raw: unknown, language: "indonesian" | "english" = "indonesian"): ParsedBrief {
+export function coerceBrief(raw: unknown, language: OutputLanguage = DEFAULT_OUTPUT_LANGUAGE): ParsedBrief {
   const r = obj(raw);
   const sec = (k: string) => obj(r[k] ?? deepFind(r, k));
   const o = sec("overview"), a = sec("audience"), p = sec("problems"), d = sec("differentiation"), pr = sec("proof"), of = sec("offer"), v = sec("voice");
@@ -208,7 +209,8 @@ export function coerceBrief(raw: unknown, language: "indonesian" | "english" = "
     location: str(c.location, 80),
     searchQueries: queries,
     contentStyle: (["professional", "friendly", "balanced", "casual"] as const).find((x) => x === style) ?? "balanced",
-    language: c.language === "english" ? "english" : c.language === "indonesian" ? "indonesian" : language,
+    // the language the user asked for wins over whatever the model wrote (G-7): a model value is never trusted
+    language: toOutputLanguage(language),
   };
   if (campaign.searchQueries.length === 0 && !content.gaps.some((g) => /jenis bisnis|business type/i.test(g))) content.gaps.push("[NEED: jenis bisnis pelanggan yang akan dicari belum jelas dari sumber, isi sendiri kata kunci pencarian]");
   // the form needs a place to search; when the sources do not say, the user has to fill it in

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fillTemplate } from "./template.service";
+import { OPT_OUT_HINT } from "./opt-out";
 
 test("fillTemplate substitutes only {nama} and {kategori}", () => {
   assert.equal(fillTemplate("Halo {nama}, untuk {kategori}", { name: " Griya Kebaya ", category: "Sewa kebaya" }), "Halo Griya Kebaya, untuk Sewa kebaya");
@@ -34,7 +35,8 @@ test("apply makes one draft per reachable lead and counts the rest", async () =>
   assert.deepEqual(r.skipped, { noContact: 1, optedOut: 1, alreadyMessaged: 2 });
   assert.equal(r.created, 1);
   assert.equal(created[0].toPhone, "628123456789");
-  assert.match(created[0].body, /^Halo Griya Kebaya, untuk Sewa kebaya\.\n\nKalau tidak berkenan, balas STOP\.$/);
+  // no language given: the Vietnamese opt-out line (FR-18, FR-29)
+  assert.equal(created[0].body, `Halo Griya Kebaya, untuk Sewa kebaya.\n\n${OPT_OUT_HINT.vietnamese}`);
   assert.equal(created[0].status, "draft");
   assert.equal(created[0].source, "ai_outreach");
 });

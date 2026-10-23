@@ -1,4 +1,5 @@
 import { SECURITY_RULE, clip } from "../ai/chat-import/style-prompt";
+import { LANGUAGE_LABEL, toOutputLanguage, type OutputLanguage } from "../common/language";
 
 export interface BriefSource {
   title: string;
@@ -7,7 +8,7 @@ export interface BriefSource {
 }
 
 export interface BriefPromptInput {
-  language: "indonesian" | "english";
+  language: OutputLanguage;
   /** What the user already wrote about the offer, if anything. Treated as rough notes, not as verified fact. */
   notes?: string;
   industry?: string;
@@ -64,7 +65,7 @@ const PASS_SCHEMA: Record<BriefPass, { keys: string; template: unknown; rules: s
     keys: "angles, campaign",
     template: {
       angles: [{ segment: "", pain: "", hook: "", benefit: "" }],
-      campaign: { name: "", target: "", location: "", searchQueries: [""], contentStyle: "balanced", language: "indonesian" },
+      campaign: { name: "", target: "", location: "", searchQueries: [""], contentStyle: "balanced", language: "vietnamese|english" },
       gaps: ["[NEED: ...]"],
     },
     rules: [
@@ -81,7 +82,7 @@ const PASS_SCHEMA: Record<BriefPass, { keys: string; template: unknown; rules: s
  * `context` carries the result of the earlier passes into the later ones.
  */
 export function buildBriefMessages(input: BriefPromptInput, pass: BriefPass = "positioning", context = ""): { role: "system" | "user"; content: string }[] {
-  const lang = input.language === "english" ? "English" : "Bahasa Indonesia";
+  const lang = LANGUAGE_LABEL[toOutputLanguage(input.language)];
   const spec = PASS_SCHEMA[pass];
   const system = [
     `Kamu product marketer senior. Tugasmu menyusun sebagian dari Marketing Brief (konteks pemasaran produk) dari materi sumber milik pengguna: bagian ${spec.keys}. Brief ini akan dibaca oleh semua modul pemasaran berikutnya (pesan outreach, konten, iklan), jadi harus akurat, spesifik, dan jujur.`,
