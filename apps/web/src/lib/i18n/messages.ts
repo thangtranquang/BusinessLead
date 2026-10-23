@@ -25,7 +25,20 @@ import { templatesEn } from "./features-templates.en";
 import { templatesId } from "./features-templates.id";
 import { knowledgeEn } from "./features-knowledge.en";
 import { knowledgeId } from "./features-knowledge.id";
+import { vi } from "./vi";
+import { authVi } from "./features-auth.vi";
+import { campaignsVi } from "./features-campaigns.vi";
+import { leadsVi } from "./features-leads.vi";
+import { adminVi } from "./features-admin.vi";
+import { marketingVi } from "./features-marketing.vi";
+import { workspaceVi } from "./features-workspace.vi";
+import { billingVi } from "./features-billing.vi";
+import { pipelineVi } from "./features-pipeline.vi";
+import { templatesVi } from "./features-templates.vi";
+import { knowledgeVi } from "./features-knowledge.vi";
 
 export const enAll = { ...en, ...authEn, ...campaignsEn, ...leadsEn, ...adminEn, ...marketingEn, ...workspaceEn, ...billingEn, ...pipelineEn, ...templatesEn, ...knowledgeEn } as const;
 export type MessageKey = keyof typeof enAll;
 export const idAll: Record<MessageKey, string> = { ...id, ...authId, ...campaignsId, ...leadsId, ...adminId, ...marketingId, ...workspaceId, ...billingId, ...pipelineId, ...templatesId, ...knowledgeId };
+/** Vietnamese dictionary (docs/i18n-vi-glossary.md). Added next to idAll; idAll goes away in the web language flip. */
+export const viAll: Record<MessageKey, string> = { ...vi, ...authVi, ...campaignsVi, ...leadsVi, ...adminVi, ...marketingVi, ...workspaceVi, ...billingVi, ...pipelineVi, ...templatesVi, ...knowledgeVi };
