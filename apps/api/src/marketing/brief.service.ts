@@ -3,11 +3,11 @@ import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { outputLanguageOrDefault, toOutputLanguage, type OutputLanguage } from "../common/language";
-import { capThenNfc } from "../common/text";
+import { capThenNfc, lacksVietnameseDiacritics } from "../common/text";
 import { AiClientService } from "../ai/ai-client.service";
 import { KnowledgeService } from "../ai/knowledge.service";
 import { buildBriefMessages, type BriefPass, type BriefSource } from "./brief-prompt";
-import { coerceBrief, extractJson, groundBrief, mergeRaw, passFailedGap, type BriefContent, type CampaignSuggestion } from "./brief-schema";
+import { coerceBrief, extractJson, groundBrief, mergeRaw, noDiacriticsGap, passFailedGap, proseOf, type BriefContent, type CampaignSuggestion } from "./brief-schema";
 import { extractDocumentText } from "./document-text";
 import { PageRenderer } from "./page-renderer";
 import { crawlSite, siteToText } from "./site-crawler";
@@ -197,6 +197,7 @@ export class BriefService {
     const raws: unknown[] = [];
     const replies: string[] = [];
     const failedPasses: BriefPass[] = [];
+    const noDiacritics: BriefPass[] = [];
     let context = "";
     for (const pass of ["positioning", "evidence", "outreach"] as const) {
       let ok = false;
@@ -206,6 +207,10 @@ export class BriefService {
           const reply = await ai.chat(buildBriefMessages(base, pass, context), { json: true, temperature: 0.3 });
           replies.push(reply);
           const raw = extractJson(reply);
+          // Vietnamese without diacritics is a defect (FR-22.1): ask once more; if the second answer is the same, keep it and flag it
+          const bad = language === "vietnamese" && lacksVietnameseDiacritics(proseOf(raw));
+          if (bad && attempt === 0) { this.logger.warn(`Brief pass ${pass} came back without diacritics, asking again`); continue; }
+          if (bad) noDiacritics.push(pass);
           raws.push(raw);
           if (pass === "positioning") context = JSON.stringify({ summary: (raw as { summary?: string }).summary, overview: (raw as { overview?: unknown }).overview, audience: (raw as { audience?: unknown }).audience });
           ok = true;
@@ -222,7 +227,7 @@ export class BriefService {
     let parsed;
     try {
       const merged = mergeRaw(raws);
-      merged.gaps = [...(merged.gaps as unknown[]), ...failedPasses.map((p) => passFailedGap(language, p))];
+      merged.gaps = [...(merged.gaps as unknown[]), ...failedPasses.map((p) => passFailedGap(language, p)), ...noDiacritics.map((p) => noDiacriticsGap(language, p))];
       parsed = groundBrief(coerceBrief(merged, language), [...sources.map((s) => s.text), notes].join("\n"));
     } catch (e) {
       this.logger.warn(`Brief unusable: ${(e as Error).message}`);

@@ -185,3 +185,68 @@ test("per-language tables are frozen, typed Record<OutputLanguage, ...> tables w
     assert.deepEqual(Object.keys(table).sort(), ["english", "vietnamese"]);
   }
 });
+
+// ---------- reply() end to end with a fake AI client: language, judge verdicts, retry note ----------
+type Msg = { role: string; content: string };
+
+function replyWriter(opts: { writes: string[]; judges: string[] }, log: { writer: Msg[][]; judge: Msg[][] }) {
+  let w = 0;
+  let j = 0;
+  const prisma = {
+    workspace: { findUnique: async () => ({ name: "Công ty Mẫu" }) },
+    styleProfile: { findUnique: async () => ({ stats: { messageCount: 5, avgChars: 40, medianChars: 30, avgWords: 7, emojiRate: 0, exclamationRate: 0, questionRate: 0, lowercaseStartRate: 0, noEndPunctuationRate: 0, multiLineRate: 0, topOpeners: [], topClosers: [], topEmoji: [], language: { vietnamese: 1, english: 0 } }, embeddingModel: "m", dimensions: 2 }) },
+    marketingBrief: { findUnique: async () => null },
+    aiRun: { create: async () => ({}) },
+  };
+  const ai = {
+    forWorkspace: async () => ({
+      enabled: true,
+      chatModel: "fake",
+      chat: async (m: Msg[], o?: { temperature?: number }) => {
+        if (o?.temperature === 0) { log.judge.push(m); return opts.judges[Math.min(j++, opts.judges.length - 1)]; }
+        log.writer.push(m);
+        return opts.writes[Math.min(w++, opts.writes.length - 1)];
+      },
+    }),
+  };
+  const style = { retrieveExamples: async () => [] };
+  const knowledge = { search: async () => ({ confidence: "none", hits: [] }) };
+  const limits = { reserveDraft: async () => async () => undefined };
+  return new MessageWriterService(prisma as never, ai as never, knowledge as never, style as never, limits as never);
+}
+const replyLead = (language: string) => ({ id: "l1", name: "Quán Mẫu", campaign: { yourService: "Phần mềm đặt bàn", language } }) as never;
+const GOOD_VI = ["INTENT: họ hỏi giá", "REPLY: Dạ, em cảm ơn anh/chị đã quan tâm ạ. Em xin gửi anh/chị thông tin chi tiết ạ."].join(NL);
+const GOOD_EN = ["INTENT: they ask the price", "REPLY: Thank you for your interest. I will send you the details shortly."].join(NL);
+
+test("reply: a passing judge returns the draft; the language reaches the writer prompt and the judge prompt", async () => {
+  for (const [language, write] of [["vietnamese", GOOD_VI], ["english", GOOD_EN]] as const) {
+    const log = { writer: [] as Msg[][], judge: [] as Msg[][] };
+    const out = await replyWriter({ writes: [write], judges: ["OK"] }, log).reply("ws", replyLead(language), "Giá bao nhiêu?", "Me: Em gửi báo giá ạ", "answer");
+    assert.ok(out && !out.risks.includes("fallback"), language);
+    assert.ok(!out!.text.includes("REPLY") && !out!.text.includes("INTENT"));
+    assert.equal(log.writer.length, 1);
+    assert.equal(log.judge.length, 1);
+    assert.equal(log.writer[0][0].content.includes(OUTPUT_RULES.vietnamese), language === "vietnamese");
+    assert.ok(log.writer[0][0].content.includes(LANGUAGE_LABEL[language]) && log.judge[0][0].content.includes(LANGUAGE_LABEL[language]));
+  }
+});
+
+test("reply: a judge NO retries once with the reason as the note; a second NO falls back to the safe wording", async () => {
+  const log = { writer: [] as Msg[][], judge: [] as Msg[][] };
+  const out = await replyWriter({ writes: [GOOD_VI], judges: ["NO: invented price [x]", "OK"] }, log).reply("ws", replyLead("vietnamese"), "Giá bao nhiêu?", "Me: Em gửi báo giá ạ", "answer");
+  assert.equal(log.writer.length, 2);
+  assert.match(log.writer[1][0].content, /Your previous reply was rejected: reviewer: invented price x\. Fix it\./);
+  assert.ok(!log.writer[0][0].content.includes("previous reply was rejected"));
+  assert.ok(out && !out.risks.includes("fallback"));
+  const log2 = { writer: [] as Msg[][], judge: [] as Msg[][] };
+  const bad = await replyWriter({ writes: [GOOD_VI], judges: ["NO: still wrong"] }, log2).reply("ws", replyLead("vietnamese"), "Giá bao nhiêu?", "Me: Em gửi báo giá ạ", "answer");
+  assert.equal(log2.writer.length, 2);
+  assert.ok(bad!.risks.includes("fallback"));
+});
+
+test("reply: a judge that fails or answers nonsense never blocks the draft", async () => {
+  const log = { writer: [] as Msg[][], judge: [] as Msg[][] };
+  const out = await replyWriter({ writes: [GOOD_EN], judges: ["Nothing wrong"] }, log).reply("ws", replyLead("english"), "How much?", "", "answer");
+  assert.equal(log.writer.length, 1);
+  assert.ok(out && !out.risks.includes("fallback"));
+});

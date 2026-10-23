@@ -158,3 +158,33 @@ test("the source digest is NFC", () => {
   const d = sourceDigest([{ title: "Trang chủ".normalize("NFD"), text: "Công ty Mẫu".normalize("NFD") }]);
   assert.equal(d, d.normalize("NFC"));
 });
+
+// ---------- TC-9.15: a Vietnamese brief without diacritics is asked for again, then kept with a gap ----------
+const NO_DIACRITICS_JSON = JSON.stringify({
+  summary: "Cong ty Mau chuyen thiet ke website cho quan ca phe",
+  overview: { oneLiner: "Thiet ke website theo yeu cau", whatItDoes: "Lam website va tu dong hoa cho cua hang", category: "Phan mem", businessModel: "Du an" },
+  gaps: [],
+});
+
+test("TC-9.15: a no-diacritics pass is asked again once and the good answer wins", async () => {
+  const saved: { create?: Record<string, unknown> } = {};
+  const calls: number[] = [];
+  const service = makeServiceWith({ title: "t", text: "Công ty Mẫu làm phần mềm đặt bàn." }, (_m, call) => { calls.push(call); return call === 0 ? NO_DIACRITICS_JSON : BRIEF_JSON; }, saved);
+  await service.generate("ws", { language: "vietnamese" });
+  assert.ok(calls.length >= 4, "the first pass was asked twice");
+  const gaps = (saved.create?.content as { gaps: string[] }).gaps;
+  assert.ok(!gaps.some((g) => /thiếu dấu/.test(g)), gaps.join(" | "));
+  assert.match(String(saved.create?.summary), /Công ty Mẫu/);
+});
+
+test("TC-9.15: when the second answer is still without diacritics the brief is kept and a gap says so; English is never checked", async () => {
+  const saved: { create?: Record<string, unknown> } = {};
+  await makeServiceWith({ title: "t", text: "Công ty Mẫu làm phần mềm." }, () => NO_DIACRITICS_JSON, saved).generate("ws", { language: "vietnamese" });
+  const gaps = (saved.create?.content as { gaps: string[] }).gaps;
+  assert.ok(gaps.some((g) => /thiếu dấu tiếng Việt/.test(g)), gaps.join(" | "));
+  const en: { create?: Record<string, unknown> } = {};
+  let calls = 0;
+  await makeServiceWith({ title: "t", text: "Company X builds software." }, () => { calls++; return NO_DIACRITICS_JSON; }, en).generate("ws", { language: "english" });
+  assert.equal(calls, 3);
+  assert.ok(!(en.create?.content as { gaps: string[] }).gaps.some((g) => /diacritics/.test(g)));
+});

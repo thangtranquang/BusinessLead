@@ -48,6 +48,7 @@ const GAP_TEXT = Object.freeze({
     noCustomerType: "[NEED: loại hình doanh nghiệp khách hàng cần tìm chưa rõ từ nguồn, hãy tự điền từ khóa tìm kiếm]",
     noLocation: "[NEED: địa điểm mục tiêu (thành phố hoặc khu vực) chưa rõ, hãy tự điền trong biểu mẫu chiến dịch]",
     passFailed: (pass: string) => `[NEED: phần "${pass}" tạo không thành công, hãy chạy tạo lại]`,
+    noDiacritics: (pass: string) => `[NEED: phần "${pass}" thiếu dấu tiếng Việt, hãy kiểm tra và sửa hoặc chạy tạo lại]`,
     notInSources: (label: string, item: string) => `[NEED: ${label} "${item}" không có trong nguồn, hãy bổ sung bằng chứng hoặc xóa]`,
     labels: Object.freeze({ number: "con số", customer: "khách hàng", testimonial: "lời nhận xét" }),
     price: "[NEED: giá không có trong nguồn, hãy điền giá đúng]",
@@ -57,12 +58,25 @@ const GAP_TEXT = Object.freeze({
     noCustomerType: "[NEED: the customer business type to search for is not clear from the sources, fill in the search terms yourself]",
     noLocation: "[NEED: target location (city or area) is not clear from the sources, fill it in on the campaign form]",
     passFailed: (pass: string) => `[NEED: the "${pass}" part could not be written, generate again]`,
+    noDiacritics: (pass: string) => `[NEED: the "${pass}" part lacks Vietnamese diacritics, check and fix it or generate again]`,
     notInSources: (label: string, item: string) => `[NEED: ${label} "${item}" was not found in the sources, add the evidence or remove it]`,
     labels: Object.freeze({ number: "figure", customer: "customer", testimonial: "testimonial" }),
     price: "[NEED: the price was not found in the sources, fill in the right price]",
     summaryNumbers: "[NEED: the summary had figures that are not in the sources, those figures were removed]",
   }),
 });
+
+/** A pass whose Vietnamese text came back without diacritics twice (kept, but flagged). */
+export function noDiacriticsGap(language: unknown, pass: string): string {
+  return GAP_TEXT[toOutputLanguage(language)].noDiacritics(pass);
+}
+
+/** The string values of a parsed model answer, joined (bounded depth and size), for language checks. */
+export function proseOf(raw: unknown, depth = 0): string {
+  if (typeof raw === "string") return raw;
+  if (depth > 5 || raw === null || typeof raw !== "object") return "";
+  return Object.values(raw as object).slice(0, 50).map((v) => proseOf(v, depth + 1)).join(" ").slice(0, 20_000);
+}
 
 /** A failed generation pass, as a gap in the brief's language (used by the brief service). */
 export function passFailedGap(language: unknown, pass: string): string {
