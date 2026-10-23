@@ -1,10 +1,10 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { anonymize } from "./anonymize";
-import { buildDraftMessages, cosine } from "./style-prompt";
+import { buildDraftMessages, cosine, describeStyle } from "./style-prompt";
 import type { StyleStats } from "./style-stats";
 
-const stats: StyleStats = { messageCount: 10, avgChars: 40, medianChars: 30, avgWords: 7, emojiRate: 0.1, exclamationRate: 0.05, questionRate: 0.2, lowercaseStartRate: 0.5, noEndPunctuationRate: 0.8, multiLineRate: 0.1, topOpeners: [{ word: "siap", count: 3 }], topClosers: [{ word: "kak", count: 4 }], topEmoji: [{ emoji: "🙏", count: 2 }], language: { indonesian: 1, english: 0 } };
+const stats: StyleStats = { messageCount: 10, avgChars: 40, medianChars: 30, avgWords: 7, emojiRate: 0.1, exclamationRate: 0.05, questionRate: 0.2, lowercaseStartRate: 0.5, noEndPunctuationRate: 0.8, multiLineRate: 0.1, topOpeners: [{ word: "siap", count: 3 }], topClosers: [{ word: "kak", count: 4 }], topEmoji: [{ emoji: "🙏", count: 2 }], language: { vietnamese: 1, english: 0 } };
 
 test("anonymize masks phones, emails and links", () => {
   assert.equal(anonymize("Hubungi 0812-3456-7890 atau a.b@mail.co.id di https://x.com/y"), "Hubungi <nomor> atau <email> di <link>");
@@ -20,7 +20,9 @@ test("cosine similarity", () => {
 test("draft prompt carries style, examples and the no-invention rule", () => {
   const m = buildDraftMessages({ businessDescription: "rental kebaya", style: stats, examples: [{ incoming: "ready?", reply: "ready kak", at: new Date() }], incoming: "tgl 12 ada?" });
   assert.match(m[0].content, /rata-rata 40 karakter/);
-  assert.match(m[0].content, /Balasan saya: Ready, Kak\./); // examples are shown in standard spelling
+  // examples are shown in standard spelling; which spelling rules apply is owned by ai/orthography.ts (Slice 6 made it per language: this
+  // Indonesian-worded example is now read as English), so only the capital letter and the full stop are asserted here
+  assert.match(m[0].content, /Balasan saya: Ready,? [Kk]ak\./);
   assert.match(m[0].content, /jangan menyebut harga/);
   assert.match(m[1].content, /tgl 12 ada\?/);
 });
@@ -34,4 +36,10 @@ test("sloppy chat habits are never described as something to imitate", () => {
   const m = buildDraftMessages({ businessDescription: "x", style: { ...stats, lowercaseStartRate: 0.9, noEndPunctuationRate: 0.95 }, examples: [], incoming: "halo" });
   assert.doesNotMatch(m[0].content, /huruf kecil di|tanpa tanda baca pada|diawali huruf kecil/);
   assert.match(m[0].content, /ejaan baku \(PUEBI\)/);
+});
+
+test("TC-30.2: a profile stored before Vietnamese support (language has indonesian, no vietnamese) still describes without throwing", () => {
+  const legacy = { ...stats, language: { indonesian: 1, english: 0 } } as unknown as StyleStats;
+  assert.doesNotThrow(() => describeStyle(legacy));
+  assert.doesNotThrow(() => describeStyle({ ...stats, language: undefined } as unknown as StyleStats, "english"));
 });

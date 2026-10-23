@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { toOutputLanguage, type OutputLanguage } from "../common/language";
+import { capThenNfc, nfc, sliceChars } from "../common/text";
 
 export const ALLOWED_SMTP_PORTS = [25, 465, 587, 2525];
 
@@ -12,9 +13,17 @@ export function emailLanguage(context: unknown): OutputLanguage {
   return toOutputLanguage((context as { language?: unknown }).language);
 }
 
-/** One header-safe line: no line breaks, bounded length. */
+/** Controls that must never reach a mail header: C0/C1 controls (CR, LF, NEL ...), line separator, paragraph separator. */
+const HEADER_BREAKS = /[\p{Cc}\u{85}\u{2028}\u{2029}]+/gu;
+/** A header value is a subject or a name, never long: anything beyond this is cut before any pass runs over it. */
+const HEADER_RAW_MAX = 4_000;
+
+/**
+ * One header-safe line: NFC, no line breaks or control characters (a CR, LF, NEL, LS or PS would end the header and start a
+ * new one), bounded length cut by code point so a tone mark or a surrogate pair is never split. Not for email addresses.
+ */
 export function headerLine(v: string, max = 200): string {
-  return v.replace(/[\r\n\v\f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  return sliceChars(capThenNfc(v, HEADER_RAW_MAX).replace(HEADER_BREAKS, " ").replace(/\s+/g, " ").trim(), max);
 }
 
 const b64 = (s: string | Buffer) => Buffer.from(s).toString("base64url");
@@ -38,15 +47,69 @@ export function verifyUnsubscribe(token: string, secret: string): { workspaceId:
   return { workspaceId, email };
 }
 
+/** The one unsubscribe line of the footer, per output language. Frozen: indexed only with a normalised language. */
+export const FOOTER_LINE: Readonly<Record<OutputLanguage, (url: string) => string>> = Object.freeze({
+  vietnamese: (url: string) => `Nếu anh/chị không muốn nhận email từ chúng tôi nữa, bấm vào đây: ${url}`,
+  english: (url: string) => `Don't want emails from us anymore? Click: ${url}`,
+});
+
 /** Plain-text footer on every message: who sends it, where they are, and a way out. */
 export function buildFooter(o: { language: OutputLanguage; url: string; fromName: string; postalAddress: string }): string {
-  const id = o.language === "vietnamese"; // Slice 7 fills this in: the Indonesian line is temporarily keyed "vietnamese"
   return [
     "--",
     headerLine(o.fromName, 120),
-    o.postalAddress.replace(/\r/g, "").trim().slice(0, 300),
-    id ? `Tidak ingin menerima email dari kami lagi? Klik: ${o.url}` : `Don't want emails from us anymore? Click: ${o.url}`,
+    sliceChars(nfc(o.postalAddress).replace(/\r/g, "").trim(), 300),
+    FOOTER_LINE[toOutputLanguage(o.language)](o.url),
   ].join("\n");
+}
+
+/** What the mail builder reads from a queued message. Only these fields: it never touches the database. */
+export interface MailMessageInput {
+  toEmail: string | null;
+  subject: string | null;
+  body: string;
+  /** Arbitrary JSON written at draft time (or by an older version). */
+  context?: unknown;
+}
+
+/** What the mail builder reads from the workspace's mail account. */
+export interface MailAccountInput {
+  fromName: string;
+  fromEmail: string;
+  replyTo?: string | null;
+  postalAddress: string;
+}
+
+export interface BuiltMailOptions {
+  from: { name: string; address: string };
+  to: string;
+  replyTo?: string;
+  subject: string;
+  text: string;
+  headers: { "List-Unsubscribe": string; "List-Unsubscribe-Post": string };
+}
+
+/**
+ * The options handed to the SMTP transport for one approved email. Pure (no I/O, no input mutated), so a test can render it with
+ * nodemailer's stream transport and read the MIME. Every message, in every language and whatever its stored context, carries the
+ * footer and both List-Unsubscribe headers. The recipient address is lower-cased and otherwise left byte-identical: the opt-out
+ * lookups and the unsubscribe token use the same form.
+ */
+export function buildMailOptions(next: MailMessageInput, account: MailAccountInput, url: string): BuiltMailOptions {
+  const language = emailLanguage(next.context);
+  return {
+    from: { name: headerLine(account.fromName, 120), address: account.fromEmail },
+    to: (next.toEmail ?? "").toLowerCase(),
+    ...(account.replyTo ? { replyTo: account.replyTo } : {}),
+    subject: headerLine(next.subject ?? ""),
+    text: `${next.body}\n\n${buildFooter({ language, url, fromName: account.fromName, postalAddress: account.postalAddress })}`,
+    headers: { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+  };
+}
+
+/** The note stored on the lead's `email_sent` activity: the subject, cut by code point (never in the middle of a character). */
+export function activityNote(subject: string | null | undefined): string {
+  return sliceChars(subject ?? "", 140);
 }
 
 /** SMTP reply codes of 5xx mean the server refused for good (bad address, rejected content); anything else may work later. */

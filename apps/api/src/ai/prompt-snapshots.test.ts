@@ -34,7 +34,7 @@ const style: StyleStats = {
   topOpeners: [{ word: "hello", count: 12 }, { word: "sure", count: 6 }],
   topClosers: [{ word: "thanks", count: 9 }, { word: "soon", count: 4 }],
   topEmoji: [{ emoji: "🙏", count: 20 }, { emoji: "😊", count: 11 }, { emoji: "👍", count: 5 }],
-  language: { indonesian: 0.1, english: 0.9 },
+  language: { vietnamese: 0.1, english: 0.9 },
 };
 
 const examples = [

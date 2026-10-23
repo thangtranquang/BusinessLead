@@ -12,9 +12,13 @@ import { WHATSAPP_PROVIDER, type RoutedWhatsappProvider } from "./whatsapp.provi
 import { EntitlementsService } from "../entitlements/entitlements.service";
 import { fitAllowed, fitLevel } from "./fit-gate";
 import { isPublicUnsubscribeBase, unsubscribeBase } from "../email/email-utils";
+import { capThenNfc, nfc, sliceChars } from "../common/text";
 
 export const MAX_BODY = 8000; // a sanity ceiling, not a style rule: WhatsApp itself allows far more
 export const MAX_EMAIL_BODY = 20000;
+/** Text typed by the owner is cut at this raw length before it is normalised (NFD is at most about 3 times longer than NFC). */
+const RAW_BODY_CAP = MAX_EMAIL_BODY * 4 + 1;
+const RAW_SUBJECT_CAP = 1000;
 
 export { isValidEmail };
 export const MAX_GENERATE = 200;
@@ -238,7 +242,7 @@ export class MessagingService {
     const account = await this.account(workspaceId);
     const phone = normalizePhone(input.phone, account.defaultCountryCode);
     if (!phone) throw new BadRequestException("That phone number is not valid");
-    const body = input.body.trim();
+    const body = capThenNfc(input.body, RAW_BODY_CAP).trim(); // NFC first, then the length check
     if (!body) throw new BadRequestException("Message is empty");
     if (body.length > MAX_BODY) throw new BadRequestException(`Message is longer than ${MAX_BODY} characters`);
     if (await this.prisma.messageOptOut.findUnique({ where: { workspaceId_phone: { workspaceId, phone } } })) {
@@ -254,13 +258,13 @@ export class MessagingService {
   }
 
   async edit(workspaceId: string, id: string, body: string, subject?: string, extras: { attachmentId?: string | null; linkPreview?: boolean } = {}) {
-    const text = body.trim();
+    const text = capThenNfc(body, RAW_BODY_CAP).trim(); // NFC first: what is checked, stored and sent is one form (FR-44.1)
     if (!text) throw new BadRequestException("Message is empty");
     const m = await this.owned(workspaceId, id);
     const max = m.channel === "email" ? MAX_EMAIL_BODY : MAX_BODY;
     if (text.length > max) throw new BadRequestException(`Message is longer than ${max} characters`);
     if (m.status !== "draft") throw new BadRequestException("Only drafts can be edited");
-    const sub = m.channel === "email" && subject !== undefined ? subject.trim().replace(/[\r\n]+/g, " ").slice(0, 200) : undefined;
+    const sub = m.channel === "email" && subject !== undefined ? sliceChars(capThenNfc(subject, RAW_SUBJECT_CAP).trim().replace(/[\r\n]+/g, " "), 200) : undefined;
     if (sub === "") throw new BadRequestException("Subject is empty");
     if (m.channel === "email" && (extras.attachmentId || extras.linkPreview)) throw new BadRequestException("Attachments and link previews are only for WhatsApp messages");
     const attachmentId = extras.attachmentId === undefined ? m.attachmentId : extras.attachmentId;
@@ -273,10 +277,14 @@ export class MessagingService {
       const auto = await maybePreview(text, undefined, !!attachmentId && text.length <= CAPTION_LIMIT);
       if (auto) linkPreview = auto as unknown as Prisma.InputJsonValue;
     }
-    return this.prisma.outboundMessage.update({
-      where: { id },
-      data: { body: text, ...(sub ? { subject: sub } : {}), ...(extras.attachmentId !== undefined ? { attachmentId: extras.attachmentId } : {}), ...(linkPreview !== undefined ? { linkPreview } : {}), editedByUser: text !== (m.aiBody ?? "") || (!!sub && sub !== m.subject) },
+    // Guarded write: only a message that is still a draft in this workspace is changed, so an edit can never overwrite a message
+    // that was approved (and is being sent) between the read above and this write.
+    const saved = await this.prisma.outboundMessage.updateMany({
+      where: { id, workspaceId, status: "draft" },
+      data: { body: text, ...(sub ? { subject: sub } : {}), ...(extras.attachmentId !== undefined ? { attachmentId: extras.attachmentId } : {}), ...(linkPreview !== undefined ? { linkPreview } : {}), editedByUser: text !== nfc(m.aiBody) || (!!sub && sub !== nfc(m.subject)) },
     });
+    if (saved.count !== 1) throw new BadRequestException("Only drafts can be edited");
+    return this.owned(workspaceId, id);
   }
 
   async approve(workspaceId: string, ids: string[]) {
@@ -286,25 +294,42 @@ export class MessagingService {
     const mailOptOuts = new Set((await this.prisma.emailOptOut.findMany({ where: { workspaceId }, select: { email: true } })).map((o) => o.email));
     const mailAccount = msgs.some((m) => m.channel === "email") ? await this.prisma.emailAccount.findUnique({ where: { workspaceId } }) : null;
     const ok: string[] = [];
+    // Drafts whose text is not NFC yet (for example an owner edit saved by an older version): approved with the NFC text in one write.
+    const fixes: { m: (typeof msgs)[number]; body: string; subject: string | null }[] = [];
     const rejected: { id: string; reason: string }[] = [];
     for (const m of msgs) {
+      // what is checked, approved and sent is the NFC text (FR-44.1); email addresses are never normalised
+      const text = nfc(m.body);
+      const subject = m.subject === null ? null : nfc(m.subject);
+      const accept = () => { if (text !== m.body || subject !== m.subject) fixes.push({ m, body: text, subject }); else ok.push(m.id); };
       if (m.channel === "email") {
         const to = (m.toEmail ?? "").trim().toLowerCase();
         if (!mailAccount) rejected.push({ id: m.id, reason: "email account is not set up" });
         else if (!isValidEmail(to)) rejected.push({ id: m.id, reason: "invalid email address" });
         else if (mailOptOuts.has(to)) rejected.push({ id: m.id, reason: "recipient opted out" });
         else if (!isPublicUnsubscribeBase(unsubscribeBase())) rejected.push({ id: m.id, reason: "PUBLIC_API_URL is not a public https address, so the unsubscribe link would not work" });
-        else if (!m.subject?.trim() || !m.body.trim() || m.body.length > MAX_EMAIL_BODY) rejected.push({ id: m.id, reason: "invalid text" });
-        else ok.push(m.id);
+        else if (!subject?.trim() || !text.trim() || text.length > MAX_EMAIL_BODY) rejected.push({ id: m.id, reason: "invalid text" });
+        else accept();
         continue;
       }
       if (!normalizePhone(m.toPhone, account.defaultCountryCode)) rejected.push({ id: m.id, reason: "invalid number" });
       else if (optOuts.has(m.toPhone)) rejected.push({ id: m.id, reason: "recipient opted out" });
-      else if (!m.body.trim() || m.body.length > MAX_BODY) rejected.push({ id: m.id, reason: "invalid text" });
-      else ok.push(m.id);
+      else if (!text.trim() || text.length > MAX_BODY) rejected.push({ id: m.id, reason: "invalid text" });
+      else accept();
     }
     if (ok.length) await this.prisma.outboundMessage.updateMany({ where: { id: { in: ok }, workspaceId, status: "draft" }, data: { status: "approved", approvedAt: new Date(), error: null } });
-    return { approved: ok.length, rejected };
+    let approved = ok.length;
+    for (const f of fixes) {
+      // ONE guarded write per message: the text, the NFC fix and the status change together, only if the draft still has the text
+      // that was checked. If the owner edited it in the meantime nothing matches and the message stays a draft.
+      const done = await this.prisma.outboundMessage.updateMany({
+        where: { id: f.m.id, workspaceId, status: "draft", body: f.m.body, ...(f.subject !== f.m.subject ? { subject: f.m.subject } : {}) },
+        data: { ...(f.body !== f.m.body ? { body: f.body } : {}), ...(f.subject !== f.m.subject ? { subject: f.subject } : {}), status: "approved", approvedAt: new Date(), error: null },
+      });
+      if (done.count === 1) approved++;
+      else rejected.push({ id: f.m.id, reason: "changed while approving, review it and approve again" });
+    }
+    return { approved, rejected };
   }
 
   async reject(workspaceId: string, ids: string[]) {

@@ -5,7 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { decide, nextGapMs, startOfLocalDay } from "../messaging/send-policy";
 import { decryptSecret } from "../settings/encryption.util";
 import { createTransport, friendlySmtpError } from "./email-transport";
-import { authFailure, buildFooter, emailLanguage, headerLine, isPermanentSmtpError, isPublicUnsubscribeBase, signUnsubscribe, unsubscribeBase } from "./email-utils";
+import { activityNote, authFailure, buildMailOptions, isPermanentSmtpError, isPublicUnsubscribeBase, signUnsubscribe, unsubscribeBase } from "./email-utils";
 
 const TICK_MS = 20_000;
 const MAX_ATTEMPTS = 3;
@@ -79,19 +79,11 @@ export class EmailSenderService implements OnModuleInit, OnModuleDestroy {
         await this.prisma.outboundMessage.update({ where: { id: next.id }, data: { status: "cancelled", error: "Recipient opted out" } });
         return;
       }
-      const language = emailLanguage(next.context);
       const url = `${this.publicBase()}/unsubscribe/${signUnsubscribe(a.workspaceId, to, this.config.getOrThrow<string>("JWT_SECRET"))}`;
       const transport = await createTransport(a, decryptSecret(a.passwordEnc, this.config.getOrThrow<string>("ENCRYPTION_KEY")));
       let info;
       try {
-        info = await transport.sendMail({
-          from: { name: headerLine(a.fromName, 120), address: a.fromEmail },
-          to,
-          ...(a.replyTo ? { replyTo: a.replyTo } : {}),
-          subject: headerLine(next.subject ?? ""),
-          text: `${next.body}\n\n${buildFooter({ language, url, fromName: a.fromName, postalAddress: a.postalAddress })}`,
-          headers: { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
-        });
+        info = await transport.sendMail(buildMailOptions(next, a, url)); // pure: footer, unsubscribe headers and safe header lines come from email-utils
       } finally { transport.close(); }
       if (info.rejected?.length) {
         await this.prisma.outboundMessage.update({ where: { id: next.id }, data: { status: "failed", error: "The mail server rejected this address" } });
@@ -104,7 +96,7 @@ export class EmailSenderService implements OnModuleInit, OnModuleDestroy {
       if (next.leadId) {
         await this.prisma.lead.updateMany({ where: { id: next.leadId, crmStatus: "new" }, data: { crmStatus: "contacted" } });
         await this.prisma.lead.update({ where: { id: next.leadId }, data: { contactedAt: at, ...(next.source === "ai_reply" || next.source === "manual" ? { needsReply: false } : {}) } });
-        await this.prisma.leadActivity.create({ data: { leadId: next.leadId, type: "email_sent", note: (next.subject ?? "").slice(0, 140), metadata: { messageId: next.id, source: next.source } } });
+        await this.prisma.leadActivity.create({ data: { leadId: next.leadId, type: "email_sent", note: activityNote(next.subject), metadata: { messageId: next.id, source: next.source } } });
       }
     } catch (e) {
       await this.onFailure(a, next.id, next.attempts + 1, e);
