@@ -1,5 +1,6 @@
 import { clip } from "../ai/chat-import/style-prompt";
 import { DEFAULT_OUTPUT_LANGUAGE, toOutputLanguage, type OutputLanguage } from "../common/language";
+import { capThenNfc, hasVietnameseMarks, nfc, wordRegex } from "../common/text";
 
 /**
  * The Marketing Brief follows the structure of the `product-marketing` skill (overview, audience, problems,
@@ -38,15 +39,67 @@ export interface ParsedBrief {
 
 const SUMMARY_MAX = 450;
 
+/**
+ * The notes that the code itself adds to `gaps` and that the owner reads on the brief page, in the brief's language. They keep
+ * the `[NEED: ...]` marker (internal protocol, the same in every language). Vietnamese wording: native-speaker review (NFR-9).
+ */
+const GAP_TEXT = Object.freeze({
+  vietnamese: Object.freeze({
+    noCustomerType: "[NEED: loại hình doanh nghiệp khách hàng cần tìm chưa rõ từ nguồn, hãy tự điền từ khóa tìm kiếm]",
+    noLocation: "[NEED: địa điểm mục tiêu (thành phố hoặc khu vực) chưa rõ, hãy tự điền trong biểu mẫu chiến dịch]",
+    passFailed: (pass: string) => `[NEED: phần "${pass}" tạo không thành công, hãy chạy tạo lại]`,
+    notInSources: (label: string, item: string) => `[NEED: ${label} "${item}" không có trong nguồn, hãy bổ sung bằng chứng hoặc xóa]`,
+    labels: Object.freeze({ number: "con số", customer: "khách hàng", testimonial: "lời nhận xét" }),
+    price: "[NEED: giá không có trong nguồn, hãy điền giá đúng]",
+    summaryNumbers: "[NEED: bản tóm tắt có con số không có trong nguồn, các con số đó đã bị xóa]",
+  }),
+  english: Object.freeze({
+    noCustomerType: "[NEED: the customer business type to search for is not clear from the sources, fill in the search terms yourself]",
+    noLocation: "[NEED: target location (city or area) is not clear from the sources, fill it in on the campaign form]",
+    passFailed: (pass: string) => `[NEED: the "${pass}" part could not be written, generate again]`,
+    notInSources: (label: string, item: string) => `[NEED: ${label} "${item}" was not found in the sources, add the evidence or remove it]`,
+    labels: Object.freeze({ number: "figure", customer: "customer", testimonial: "testimonial" }),
+    price: "[NEED: the price was not found in the sources, fill in the right price]",
+    summaryNumbers: "[NEED: the summary had figures that are not in the sources, those figures were removed]",
+  }),
+});
+
+/** A failed generation pass, as a gap in the brief's language (used by the brief service). */
+export function passFailedGap(language: unknown, pass: string): string {
+  return GAP_TEXT[toOutputLanguage(language)].passFailed(pass);
+}
+
+// a gap about the same thing written earlier, in any language the app has used, is not repeated
+const SEEN_CUSTOMER_TYPE = /jenis bisnis|business type|loại hình/i;
+const SEEN_LOCATION = /lokasi|location|địa điểm/i;
+
 /** Words that mark a job title or the seller's own kind of service: neither is a business you can search for on Google Maps. */
 const NOT_A_CUSTOMER_BUSINESS = /\b(manajer|manager|direktur|director|pemilik|owner|ceo|cto|kepala|staf|staff|karyawan|pengambil keputusan|manajemen|pengelolaan|inventaris|pelatihan|konsultasi|solusi|otomatisasi|otomasi|automasi|automation|digitalisasi|software|perangkat lunak|aplikasi|sistem|system|platform|jasa|layanan|outsourc\w*|konsultan it|chatbot|ai|asisten|ai agent|machine learning|pengembangan|pembuatan website)\b/i;
 
-/** A search term that names a kind of place ("toko handphone", "klinik gigi"), not a role, a service or a sentence. */
+/**
+ * The Vietnamese counterpart (FR-39): job titles and the seller's own services, as whole words or phrases between Unicode word
+ * boundaries (never an ASCII word boundary, which splits "đ" and any letter with a mark). "tư vấn" and "thiết kế" alone are not
+ * listed: "công ty tư vấn" and "tiệm thiết kế nội thất" are real kinds of place.
+ */
+export const NOT_A_CUSTOMER_BUSINESS_WORDS: readonly string[] = Object.freeze([
+  "giám đốc", "trưởng phòng", "nhân viên", "chủ doanh nghiệp", "chủ sở hữu", "chủ cửa hàng", "chủ quán", "chủ shop", "người quản lý", "nhà quản lý",
+  "lãnh đạo", "người ra quyết định", "người quyết định", "phần mềm", "dịch vụ", "ứng dụng", "hệ thống", "nền tảng", "giải pháp", "tự động hóa",
+  "chuyển đổi số", "số hóa", "trí tuệ nhân tạo", "trợ lý ảo", "lập trình", "thiết kế website", "thiết kế web", "quy trình",
+]);
+const NOT_A_CUSTOMER_BUSINESS_VI = wordRegex(NOT_A_CUSTOMER_BUSINESS_WORDS, "iu");
+
+const TERM_MAX_RAW = 400;
+
+/** A search term that names a kind of place ("toko handphone", "klinik gigi", "tiệm cắt tóc"), not a role, a service or a sentence. */
 export function isCustomerBusinessTerm(term: string): boolean {
-  const t = term.trim();
-  return t.length >= 3 && t.length <= 40 && t.split(/\s+/).length <= 4 && !NOT_A_CUSTOMER_BUSINESS.test(t) && !/[.!?:;]/.test(t);
+  if (typeof term !== "string" || term.length > TERM_MAX_RAW) return false;
+  const t = nfc(term).trim();
+  // a Vietnamese kind of place is written in more words ("cửa hàng điện thoại di động"): every syllable is a word
+  const maxWords = hasVietnameseMarks(t) ? 6 : 4;
+  return t.length >= 3 && t.length <= 40 && t.split(/\s+/).length <= maxWords && !NOT_A_CUSTOMER_BUSINESS.test(t) && !NOT_A_CUSTOMER_BUSINESS_VI.test(t) && !/[.!?:;]/.test(t);
 }
-const str = (v: unknown, max = 600): string => (typeof v === "string" ? clip(v, max) : typeof v === "number" ? String(v) : "");
+/** Text from a model or a person, as NFC (FR-44.2): capped before it is normalised, then clipped. */
+const str = (v: unknown, max = 600): string => (typeof v === "string" ? clip(capThenNfc(v, max * 4), max) : typeof v === "number" ? String(v) : "");
 const list = (v: unknown, n: number, max = 300): string[] =>
   (Array.isArray(v) ? v : typeof v === "string" && v.trim() ? [v] : []).map((x) => str(x, max)).filter(Boolean).slice(0, n);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -212,9 +265,10 @@ export function coerceBrief(raw: unknown, language: OutputLanguage = DEFAULT_OUT
     // the language the user asked for wins over whatever the model wrote (G-7): a model value is never trusted
     language: toOutputLanguage(language),
   };
-  if (campaign.searchQueries.length === 0 && !content.gaps.some((g) => /jenis bisnis|business type/i.test(g))) content.gaps.push("[NEED: jenis bisnis pelanggan yang akan dicari belum jelas dari sumber, isi sendiri kata kunci pencarian]");
+  const gapText = GAP_TEXT[campaign.language];
+  if (campaign.searchQueries.length === 0 && !content.gaps.some((g) => SEEN_CUSTOMER_TYPE.test(g))) content.gaps.push(gapText.noCustomerType);
   // the form needs a place to search; when the sources do not say, the user has to fill it in
-  if (!campaign.location && !content.gaps.some((g) => /lokasi|location/i.test(g))) content.gaps.push("[NEED: lokasi target (kota atau wilayah) belum jelas, isi sendiri di form kampanye]");
+  if (!campaign.location && !content.gaps.some((g) => SEEN_LOCATION.test(g))) content.gaps.push(gapText.noLocation);
   let summary = str(r.summary, SUMMARY_MAX);
   if (!summary) summary = clip([content.overview.oneLiner, content.overview.whatItDoes].filter(Boolean).join(" "), SUMMARY_MAX);
   if (!summary) throw new Error("the model did not return a usable brief");
@@ -236,47 +290,73 @@ export function dedupeGaps(gaps: string[]): string[] {
   return kept.map((k) => k.gap);
 }
 
-const digits = (s: string) => s.replace(/[.,\s]/g, "");
-const numbersIn = (s: string) => (s.match(/\d[\d.,]*/g) ?? []).map(digits).filter((n) => n.length >= 1);
+const isGroup = (part: string) => part.length === 3;
+/** A leading group of one to three digits (no leading zero) followed by groups of exactly three digits: "2.000.000", "1,234". */
+const isGroupedInteger = (parts: string[]) => parts[0].length >= 1 && parts[0].length <= 3 && !parts[0].startsWith("0") && parts.slice(1).every(isGroup);
+
+/**
+ * One form for a number written with dots or commas (G-8, FR-23): the digits only, so "2.000.000", "2,000,000" and "2000000" are
+ * the same number. A separator followed by exactly three digits is a grouping and is dropped; a decimal part of one or two digits
+ * (or more than three) stays a decimal, so "2,5" is 2.5 and never "25", and "4,5" equals "4.5". Anything that reads both ways
+ * ("1.5.2", "1,2,3") falls back to digits only. A separator ending a sentence ("2.000.000.") is ignored.
+ */
+export function normalizeNumber(token: string): string {
+  const t = String(token).replace(/[.,]+$/, "");
+  const parts = t.split(/[.,]/);
+  if (parts.length === 1) return t;
+  if (isGroupedInteger(parts)) return parts.join("");
+  const integer = parts.slice(0, -1);
+  if (integer.length === 1 || isGroupedInteger(integer)) {
+    const fraction = parts[parts.length - 1].replace(/0+$/, "");
+    return fraction ? `${integer.join("")}.${fraction}` : integer.join("");
+  }
+  return parts.join("");
+}
+
+const numbersIn = (s: string) => (s.match(/\d[\d.,]*/g) ?? []).map(normalizeNumber).filter((n) => n.length >= 1);
 
 /**
  * Anything presented as evidence must be traceable to the sources: numbers must occur in them, and customer names
  * and testimonials must (mostly) occur too. Items that are not are removed and reported as gaps, so a model that
- * invents "trusted by 500 businesses" cannot put it into a brief.
+ * invents "trusted by 500 businesses" cannot put it into a brief. Numbers match by `normalizeNumber`, so the grouping
+ * separator (Vietnamese dots, English commas) does not matter. The notes follow the brief's language.
  */
 export function groundBrief(brief: ParsedBrief, sourceText: string): ParsedBrief {
-  const corpus = sourceText.toLowerCase();
-  const corpusDigits = digits(sourceText);
-  const numbersOk = (item: string) => numbersIn(item).every((n) => corpusDigits.includes(n));
+  const gapText = GAP_TEXT[toOutputLanguage(brief.campaign?.language)];
+  const sources = nfc(sourceText);
+  const corpus = sources.toLowerCase();
+  const corpusNumbers = new Set(numbersIn(sources));
+  const numbersOk = (item: string) => numbersIn(nfc(item)).every((n) => corpusNumbers.has(n));
   const wordsOk = (item: string) => {
-    if (corpus.includes(item.toLowerCase())) return true;
-    const words = item.toLowerCase().split(/\s+/).filter((w) => w.length >= 4);
+    const lower = nfc(item).toLowerCase();
+    if (corpus.includes(lower)) return true;
+    const words = lower.split(/\s+/).filter((w) => w.length >= 4);
     return words.length > 0 && words.filter((w) => corpus.includes(w)).length / words.length >= 0.6;
   };
   const dropped: string[] = [];
   const keep = (items: string[], label: string, ok: (s: string) => boolean) =>
     items.filter((i) => {
       if (ok(i)) return true;
-      dropped.push(`[NEED: ${label} "${i.slice(0, 80)}" tidak ditemukan di sumber, tambahkan buktinya atau hapus]`);
+      dropped.push(gapText.notInSources(label, i.slice(0, 80)));
       return false;
     });
   const c = brief.content;
   const proof = {
-    metrics: keep(c.proof.metrics, "angka", (i) => numbersIn(i).length > 0 && numbersOk(i)),
-    customers: keep(c.proof.customers, "pelanggan", wordsOk),
-    testimonials: keep(c.proof.testimonials, "testimoni", wordsOk),
+    metrics: keep(c.proof.metrics, gapText.labels.number, (i) => numbersIn(nfc(i)).length > 0 && numbersOk(i)),
+    customers: keep(c.proof.customers, gapText.labels.customer, wordsOk),
+    testimonials: keep(c.proof.testimonials, gapText.labels.testimonial, wordsOk),
   };
   let pricing = c.offer.pricing;
-  if (pricing && !(numbersIn(pricing).length === 0 || numbersOk(pricing))) {
-    dropped.push("[NEED: harga tidak ditemukan di sumber, isi harga yang benar]");
+  if (pricing && !(numbersIn(nfc(pricing)).length === 0 || numbersOk(pricing))) {
+    dropped.push(gapText.price);
     pricing = "";
   }
   // numbers in the summary follow the same rule
   const summaryNumbersOk = numbersOk(brief.summary);
   const summary = summaryNumbersOk
     ? brief.summary
-    : clip(brief.summary.replace(/\b\d[\d.,]*\s?(%|persen|x|kali|tahun|bulan|klien|pelanggan)?(?=\s|$|[.,])/gi, "").replace(/\s{2,}/g, " "), SUMMARY_MAX);
-  if (!summaryNumbersOk) dropped.push("[NEED: ringkasan memuat angka yang tidak ada di sumber, angka itu dihapus]");
+    : clip(brief.summary.replace(/\b\d[\d.,]*\s?(%|persen|x|kali|tahun|bulan|klien|pelanggan|phần trăm|lần|năm|tháng|khách hàng|khách|đối tác|doanh nghiệp|cửa hàng)?(?=\s|$|[.,])/giu, "").replace(/\s{2,}/g, " "), SUMMARY_MAX);
+  if (!summaryNumbersOk) dropped.push(gapText.summaryNumbers);
   return {
     summary,
     campaign: brief.campaign,

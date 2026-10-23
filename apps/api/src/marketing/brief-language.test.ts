@@ -79,3 +79,52 @@ test("coerceBrief: the requested language wins over what the model wrote, and de
 test("a legacy brief JSON reads as English through the normaliser (TC-28.5)", () => {
   for (const stored of ["indonesian", 5, null, undefined, {}]) assert.equal(toOutputLanguage(stored), "english");
 });
+
+// ---------- NFC at ingest and gaps in the brief language (FR-44.1, FR-20; Slice 6) ----------
+
+function makeServiceWith(source: { title: string; text: string }, chat: (messages: { role: string; content: string }[], call: number) => string, saved: { create?: Record<string, unknown> }, existingLanguage?: string) {
+  let call = 0;
+  const prisma = {
+    knowledgeSource: { findMany: async () => [{ id: "s1", title: source.title, url: "https://example.com", text: source.text }] },
+    marketingBrief: {
+      findUnique: async () => (existingLanguage ? { version: 1, language: existingLanguage, content: {}, sourceIds: [] } : null),
+      upsert: async ({ create }: { create: Record<string, unknown> }) => {
+        saved.create = create;
+        return { version: 1, language: create.language, summary: create.summary, content: create.content, sourceIds: create.sourceIds, updatedAt: new Date() };
+      },
+      update: async ({ data }: { data: Record<string, unknown> }) => ({ version: 2, language: existingLanguage, summary: data.summary, content: data.content, sourceIds: [], updatedAt: new Date() }),
+    },
+    aiRun: { create: async () => ({}) },
+  };
+  const ai = { forWorkspace: async () => ({ enabled: true, chatModel: "fake", chat: async (messages: { role: string; content: string }[]) => chat(messages, call++) }) };
+  return new BriefService(prisma as never, ai as never, {} as never, {} as never, { get: () => undefined } as never);
+}
+
+test("a decomposed source and decomposed notes reach the prompt as NFC (TC-43.3)", async () => {
+  const text = "Công ty Mẫu làm phần mềm đặt bàn cho quán cà phê.";
+  const prompts: string[] = [];
+  const saved: { create?: Record<string, unknown> } = {};
+  await makeServiceWith({ title: "Trang chủ".normalize("NFD"), text: text.normalize("NFD") }, (m) => { prompts.push(JSON.stringify(m)); return BRIEF_JSON; }, saved).generate("ws", { notes: "Ghi chú: chúng tôi thiết kế theo yêu cầu cho quán.".normalize("NFD") });
+  assert.ok(prompts.length >= 3);
+  for (const p of prompts) {
+    assert.equal(p, p.normalize("NFC"), "no decomposed letter reached the model");
+  }
+  assert.ok(prompts.some((p) => p.includes(text)));
+});
+
+test("a pass that fails leaves a gap in the brief language (FR-20)", async () => {
+  for (const [language, pattern] of [["vietnamese", /tạo không thành công/], ["english", /could not be written/]] as const) {
+    const saved: { create?: Record<string, unknown> } = {};
+    await makeServiceWith({ title: "t", text: "Công ty Mẫu làm phần mềm đặt bàn." }, (_m, call) => { if (call >= 2) throw new Error("model down"); return BRIEF_JSON; }, saved).generate("ws", { language });
+    const gaps = (saved.create?.content as { gaps: string[] }).gaps;
+    assert.ok(gaps.some((g) => pattern.test(g) && /outreach/.test(g)), `${language}: ${gaps.join(" | ")}`);
+  }
+});
+
+test("saving an edited brief keeps the brief's language for the gaps it adds (TC-9.7)", async () => {
+  const empty = { overview: {}, audience: {}, problems: {}, differentiation: {}, proof: {}, offer: {}, voice: {} };
+  const saved: { create?: Record<string, unknown> } = {};
+  const service = makeServiceWith({ title: "t", text: "x" }, () => BRIEF_JSON, saved, "english");
+  const view = await service.save("ws", "Company X builds booking software for cafes.", { ...empty, objections: [], angles: [], gaps: [] } as never);
+  assert.ok(view.content.gaps.some((g) => /target location/.test(g)), view.content.gaps.join(" | "));
+});

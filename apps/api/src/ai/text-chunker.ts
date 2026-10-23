@@ -1,3 +1,8 @@
+import { capThenNfc } from "../common/text";
+
+/** Far above any caller (sources are stored up to 400,000 characters); the cap only stops a hostile input. */
+const MAX_INPUT_CHARS = 2_000_000;
+
 export interface ChunkOptions {
   /** Target maximum characters per chunk. */
   maxChars?: number;
@@ -8,9 +13,11 @@ export interface ChunkOptions {
 /**
  * Splits text into chunks on paragraph, then sentence, boundaries. Pure and
  * deterministic so it can be tested without a database or an AI provider.
+ * The text is made NFC first (FR-44.1), so the same Vietnamese text is chunked, and later embedded, identically
+ * whether it arrived precomposed or decomposed.
  */
 export function chunkText(input: string, { maxChars = 900, overlap = 120 }: ChunkOptions = {}): string[] {
-  const text = input.replace(/\r\n/g, "\n").trim();
+  const text = capThenNfc(input, MAX_INPUT_CHARS).replace(/\r\n/g, "\n").trim();
   if (!text) return [];
 
   const pieces: string[] = [];

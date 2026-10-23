@@ -2,11 +2,12 @@ import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnav
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { outputLanguageOrDefault, type OutputLanguage } from "../common/language";
+import { outputLanguageOrDefault, toOutputLanguage, type OutputLanguage } from "../common/language";
+import { capThenNfc } from "../common/text";
 import { AiClientService } from "../ai/ai-client.service";
 import { KnowledgeService } from "../ai/knowledge.service";
 import { buildBriefMessages, type BriefPass, type BriefSource } from "./brief-prompt";
-import { coerceBrief, extractJson, groundBrief, mergeRaw, type BriefContent, type CampaignSuggestion } from "./brief-schema";
+import { coerceBrief, extractJson, groundBrief, mergeRaw, passFailedGap, type BriefContent, type CampaignSuggestion } from "./brief-schema";
 import { extractDocumentText } from "./document-text";
 import { PageRenderer } from "./page-renderer";
 import { crawlSite, siteToText } from "./site-crawler";
@@ -15,6 +16,10 @@ import { validatePublicUrl } from "./url-fetch";
 const MAX_SOURCES_FOR_BRIEF = 8;
 const MAX_SOURCES_PER_WORKSPACE = 40;
 const MAX_CONCURRENT_READS = 2;
+/** The most text kept for one source (it is stored and indexed as NFC, FR-44.1). */
+const MAX_SOURCE_CHARS = 400_000;
+const MAX_TITLE_CHARS = 120;
+const MAX_NOTES_CHARS = 10_000;
 
 export interface GenerateInput {
   sourceIds?: string[];
@@ -97,8 +102,8 @@ export class BriefService {
         const why = result.failed[0]?.reason ?? "nothing readable was found";
         throw new Error(`Could not read this site: ${why}. Paste the text instead.`);
       }
-      const text = siteToText(result);
-      await this.prisma.knowledgeSource.update({ where: { id: sourceId }, data: { text: text.slice(0, 400_000), title: new URL(url).hostname } });
+      const text = capThenNfc(siteToText(result), MAX_SOURCE_CHARS);
+      await this.prisma.knowledgeSource.update({ where: { id: sourceId }, data: { text, title: new URL(url).hostname } });
       this.progress.set(sourceId, { stage: "indexing", pages: result.pages.length, discovered: result.discovered });
       this.logger.log(`Read ${result.pages.length}/${result.discovered} pages of ${new URL(url).hostname} (${result.notes.join("; ")})`);
       await this.knowledge.index(workspaceId, sourceId, text);
@@ -116,7 +121,7 @@ export class BriefService {
 
   async addText(workspaceId: string, title: string, content: string, kind = "text") {
     await this.assertRoom(workspaceId);
-    return this.knowledge.addText(workspaceId, { title, content, kind });
+    return this.knowledge.addText(workspaceId, { title: capThenNfc(title, MAX_TITLE_CHARS), content: capThenNfc(content, MAX_SOURCE_CHARS), kind });
   }
 
   async addFile(workspaceId: string, file: { originalname: string; buffer: Buffer }) {
@@ -182,13 +187,13 @@ export class BriefService {
       take: MAX_SOURCES_FOR_BRIEF,
       select: { id: true, title: true, url: true, text: true },
     });
-    const notes = (input.notes ?? "").trim();
+    const notes = capThenNfc(input.notes ?? "", MAX_NOTES_CHARS).trim();
     if (rows.length === 0 && notes.length < 30) throw new BadRequestException("Add at least one source (a link, text or a file), or describe your offer in a few sentences.");
 
-    const sources: BriefSource[] = rows.map((r) => ({ title: r.title, url: r.url, text: r.text ?? "" }));
+    const sources: BriefSource[] = rows.map((r) => ({ title: capThenNfc(r.title, MAX_TITLE_CHARS), url: r.url, text: capThenNfc(r.text ?? "", MAX_SOURCE_CHARS) }));
     const budget = Number(this.config.get("BRIEF_SOURCE_CHARS")) || 30_000;
     const started = Date.now();
-    const base = { language, notes, industry: input.industry, location: input.location, sources, budget } as const;
+    const base = { language, notes, industry: input.industry && capThenNfc(input.industry, MAX_TITLE_CHARS), location: input.location && capThenNfc(input.location, MAX_TITLE_CHARS), sources, budget } as const;
     const raws: unknown[] = [];
     const replies: string[] = [];
     const failedPasses: BriefPass[] = [];
@@ -217,7 +222,7 @@ export class BriefService {
     let parsed;
     try {
       const merged = mergeRaw(raws);
-      merged.gaps = [...(merged.gaps as unknown[]), ...failedPasses.map((p) => `[NEED: bagian "${p}" gagal dibuat, jalankan generate ulang]`)];
+      merged.gaps = [...(merged.gaps as unknown[]), ...failedPasses.map((p) => passFailedGap(language, p))];
       parsed = groundBrief(coerceBrief(merged, language), [...sources.map((s) => s.text), notes].join("\n"));
     } catch (e) {
       this.logger.warn(`Brief unusable: ${(e as Error).message}`);
@@ -240,7 +245,7 @@ export class BriefService {
   async save(workspaceId: string, summary: string, content: BriefContent): Promise<BriefView> {
     const existing = await this.prisma.marketingBrief.findUnique({ where: { workspaceId } });
     if (!existing) throw new NotFoundException("Generate a brief first");
-    const { summary: s, content: c } = coerceBrief({ summary, ...content });
+    const { summary: s, content: c } = coerceBrief({ summary, ...content }, toOutputLanguage(existing.language));
     const keepCampaign = (existing.content as { __campaign?: CampaignSuggestion }).__campaign;
     const saved = await this.prisma.marketingBrief.update({
       where: { workspaceId },
