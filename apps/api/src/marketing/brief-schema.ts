@@ -365,11 +365,13 @@ export function groundBrief(brief: ParsedBrief, sourceText: string): ParsedBrief
     dropped.push(gapText.price);
     pricing = "";
   }
-  // numbers in the summary follow the same rule
+  // numbers in the summary follow the same rule. The unit list below is a deliberate grounding filter: the Indonesian units are
+  // legacy tolerance (stored briefs and sources may still be Indonesian), the Vietnamese ones (phần trăm, lần, năm, tháng,
+  // khách hàng, ...) are current. A number followed by a unit is removed together with it when the sources do not hold it.
   const summaryNumbersOk = numbersOk(brief.summary);
   const summary = summaryNumbersOk
     ? brief.summary
-    : clip(brief.summary.replace(/\b\d[\d.,]*\s?(%|persen|x|kali|tahun|bulan|klien|pelanggan|phần trăm|lần|năm|tháng|khách hàng|khách|đối tác|doanh nghiệp|cửa hàng)?(?=\s|$|[.,])/giu, "").replace(/\s{2,}/g, " "), SUMMARY_MAX);
+    : clip(brief.summary.replace(/(?<![\p{L}\p{M}\p{N}])\d[\d.,]*\s?(%|persen|x|kali|tahun|bulan|klien|pelanggan|phần trăm|lần|năm|tháng|khách hàng|khách|đối tác|doanh nghiệp|cửa hàng)?(?=\s|$|[.,])/giu, "").replace(/\s{2,}/g, " "), SUMMARY_MAX);
   if (!summaryNumbersOk) dropped.push(gapText.summaryNumbers);
   return {
     summary,

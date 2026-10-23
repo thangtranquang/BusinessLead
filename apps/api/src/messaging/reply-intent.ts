@@ -124,7 +124,17 @@ const VI: Partial<Record<ReplyIntent, ViMatcher>> = {
   }),
 };
 
-const RULES: { intent: ReplyIntent; patterns: RegExp[] }[] = [
+/**
+ * Legacy tolerance, on purpose: the Indonesian and English patterns below stay because an existing lead may still reply in
+ * Indonesian (or English) to a Vietnamese campaign. Their ASCII word boundary would match a fragment of an accented Vietnamese
+ * word, so every one is rewritten to a Unicode word boundary once, at load.
+ */
+const WORD_CHAR = String.raw`[\p{L}\p{M}\p{N}_]`;
+const UNICODE_BOUNDARY = `(?:(?<!${WORD_CHAR})(?=${WORD_CHAR})|(?<=${WORD_CHAR})(?!${WORD_CHAR}))`;
+const unicodeBoundaries = (source: string): string => source.split("\\b").join(UNICODE_BOUNDARY);
+const uni = (re: RegExp): RegExp => new RegExp(unicodeBoundaries(re.source), re.flags.includes("u") ? re.flags : `${re.flags}u`);
+
+const RULES_LEGACY: { intent: ReplyIntent; patterns: RegExp[] }[] = [
   {
     // a shop's automatic greeting is not a person answering: it must not move the deal or call for an answer
     intent: "auto_reply",
@@ -213,6 +223,8 @@ const RULES: { intent: ReplyIntent; patterns: RegExp[] }[] = [
   },
 ];
 
+const RULES = RULES_LEGACY.map((r) => ({ intent: r.intent, patterns: r.patterns.map(uni) }));
+
 /** A short "yes": the whole message is an agreement ("boleh kak", "iya", "silakan", "ok"). */
 const YES = /^\s*(ya+|iy+a+h?|yap|yup|y|ok+e*y?|okay|baik|boleh|bisa|silah?kan|monggo|mangga|mau|siap|sip|jadi|lanjut|gas|betul|benar|sure|yes|yeah|please)(\s+(kak|kakak|ka|kk|bu|pak|mas|mbak|ya|dong|aja|saja|banget|sekali|silakan|boleh|bisa|mau|nanti|terima\s*kasih|makasih))*\s*[.!]*\s*$/i;
 
@@ -237,7 +249,7 @@ export function isCourtesy(text: string): boolean {
   return words.length > 0 && words.length <= 8 && words.every((w) => COURTESY_WORDS.has(w));
 }
 /** We had offered a call, a demo or a talk, so a "yes" means a meeting. */
-const OFFERED_MEETING_ID = /\b(demo|diskusi|didiskusikan|ngobrol|bicara|bertemu|ketemu|zoom|meet|video\s*call|telepon|telp|call|konsultasi|presentasi)\b/i;
+const OFFERED_MEETING_ID = uni(/\b(demo|diskusi|didiskusikan|ngobrol|bicara|bertemu|ketemu|zoom|meet|video\s*call|telepon|telp|call|konsultasi|presentasi)\b/i);
 const OFFERED_MEETING_VI = viMatcher({ marked: ["demo|trao đổi|nói chuyện|gặp|họp|zoom|google meet|video call|cuộc gọi|gọi điện|gọi video|tư vấn trực tiếp|hẹn lịch|lịch hẹn|trình bày|thuyết trình"] });
 const OFFERED_MEETING = { test: (s: string): boolean => OFFERED_MEETING_ID.test(s) || OFFERED_MEETING_VI.test(s) };
 
@@ -349,7 +361,7 @@ export function planReplyOutcome(currentStage: string, intent: ReplyIntent): Rep
 
 /** A shop's automatic greeting answers within seconds; a person almost never does. Only a clear intent keeps it from counting as automatic. */
 export const AUTO_REPLY_WINDOW_MS = 45_000;
-const CLEAR_INTENT_ID = String.raw`\b(?:harga|berapa|biaya|tarif|tertarik|berminat|boleh|mau|demo|jelaskan|kirim(?:kan)?|dikirim|info|coba|contoh\w*|silah?kan|monggo|iya|ya|ok|oke|dibuat\w*|dibuatkan|ditunjukkan)\b`;
+const CLEAR_INTENT_ID = unicodeBoundaries(String.raw`\b(?:harga|berapa|biaya|tarif|tertarik|berminat|boleh|mau|demo|jelaskan|kirim(?:kan)?|dikirim|info|coba|contoh\w*|silah?kan|monggo|iya|ya|ok|oke|dibuat\w*|dibuatkan|ditunjukkan)\b`);
 /** Vietnamese cues of a person who wants something ("giá bao nhiêu", "được", "gửi giúp em"), with and without diacritics (FR-42a). */
 const CLEAR_INTENT_VI = ["giá bao nhiêu", "bao nhiêu", "báo giá", "được", "gửi giúp", "gửi giùm", "gửi cho", "cho mình xin", "cho em xin", "xin thông tin", "quan tâm", "hứng thú", "xem thử", "dùng thử", "đồng ý"]
   .flatMap((w) => [w, w.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d")])

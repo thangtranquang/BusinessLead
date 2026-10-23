@@ -140,7 +140,7 @@ test("approve: if the owner edited the draft after it was read, the guarded writ
 });
 
 test("approve: text that is already NFC keeps the single bulk write it always had", async () => {
-  const h = harness([row(), row({ id: "m2" })]);
+  const h = harness([row(), row({ id: "m2" })], { updateManyCount: 2 });
   const r = await h.svc.approve("ws1", ["m1", "m2"]);
   assert.equal(r.approved, 2);
   assert.equal(h.calls.length, 1);
@@ -171,4 +171,12 @@ test("the recipient address is never normalised: an NFD local part is looked up 
   const r = await h.svc.approve("ws1", ["m1"]);
   assert.deepEqual(r.rejected, [{ id: "m1", reason: "recipient opted out" }]);
   assert.equal(nfc(address) === address, false);
+});
+
+test("approve: the approved count is the number of rows the guarded batch really moved, not the number checked", async () => {
+  const h = harness([row({ id: "a" }), row({ id: "b" })], { updateManyCount: 1 });
+  const r = await h.svc.approve("ws1", ["a", "b"]);
+  assert.equal(r.approved, 1);
+  const h0 = harness([row({ id: "a" })], { updateManyCount: 0 });
+  assert.equal((await h0.svc.approve("ws1", ["a"])).approved, 0);
 });

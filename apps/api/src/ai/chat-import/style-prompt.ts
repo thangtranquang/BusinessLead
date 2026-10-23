@@ -375,7 +375,7 @@ export function buildOutreachMessages(input: OutreachPromptInput): { role: "syst
     : "No additional business facts: do not mention prices, packages, promotions, timelines or promised results.";
   const system = [
     `You are writing a ${fu ? `FOLLOW-UP MESSAGE #${fu.number} (of a maximum of ${fu.of})` : "FIRST MESSAGE"} ${email ? "EMAIL (body only, no subject)" : "WhatsApp message"} on behalf of this business owner: ${bd}`,
-    `What is being offered: ${input.offer}${input.offerKind === "service" && !input.followUp ? " (technical description: pick the part most relevant to the recipient and rewrite it in plain, everyday words)" : ""}`,
+    `What is being offered: ${clip(input.offer, 2000)}${input.offerKind === "service" && !input.followUp ? " (technical description: pick the part most relevant to the recipient and rewrite it in plain, everyday words)" : ""}`,
     fu
       ? `The recipient has not replied to the previous message (${fu.daysSince} day${fu.daysSince === 1 ? "" : "s"} ago):\n"${untrusted(fu.previousMessage, 1_500)}"\nOpen with "${email ? p.hiEmail : p.hiWa}". Write a short, gentle follow-up. Do not repeat the previous message. ${fu.number >= fu.of ? "This is the last one: close politely and say you will not contact them again." : "Give one new reason or a light question."}`
       : input.offerKind === "service"
@@ -447,7 +447,7 @@ export function buildOutreachMessages(input: OutreachPromptInput): { role: "syst
     input.offerKind === "service"
       ? "- One fact from the recipient's data (rating, reviews, website) may be mentioned if it feels natural; if not, skip it. Do not force it."
       : "- Mention exactly one specific fact from the data as-is (e.g. rating and review count, no website listed, or location), then connect it to the offer.",
-    `- The recipient is a: ${clip(input.lead.category ?? input.lead.name, 80)}. Any business types listed in the offer or brief (e.g. cameras, cars, event equipment) are just examples of other customers. Do not mention any that are not the recipient's type of business; if the recipient's type is not on that list, name their own type (as in the category above).`,
+    "- The recipient's own type of business is the one in the category (or business name) line of the data block above. Any business types listed in the offer or brief (e.g. cameras, cars, event equipment) are just examples of other customers. Do not mention any that are not the recipient's type of business; if the recipient's type is not on that list, name their own type (as in the data block above).",
     "- Match the recipient's type of business. Only mention offer capabilities that are useful for a business like that. Capabilities specific to other types of business must NOT be mentioned, even if they appear in the brief or facts.",
     ...(input.retryNote ? [`- Previous draft was rejected: ${clip(input.retryNote, 300)}. Fix it.`] : []),
     ...(input.avoid?.length ? [`- DO NOT use these words, because they belong to other types of business and are not relevant to the recipient: ${input.avoid.map((w) => clip(w, 40)).join(", ")}.`] : []),

@@ -151,3 +151,19 @@ test("intentMessages: Me:/Them: labels, English instructions, security rule, hos
   assert.ok(!/[＜＞]/u.test(user.content) && user.content.includes("Me: Em gửi báo giá ạ"));
   for (const label of ["interested", "meeting", "price", "question", "referral", "ack", "not_now", "not_interested", "auto_reply", "other"]) assert.ok(sys.content.includes(`- ${label}:`), label);
 });
+
+// ---------- review MINOR-4: the legacy Indonesian/English cues use Unicode word boundaries ----------
+
+test("a fragment of an accented Vietnamese word is not a clear-intent cue (ya, ok, info, mau, demo)", () => {
+  for (const fragment of ["ớya", "ớok", "ớinfo", "ớmau", "ớdemo", "ềcoba", "ạiya"]) {
+    assert.equal(looksAutomaticByTiming(`Cảm ơn bạn đã liên hệ ${fragment}`, 20_000), true, fragment);
+  }
+  for (const real of ["ya", "ok kak", "mau demo", "info dong", "dạ được ạ"]) {
+    assert.equal(looksAutomaticByTiming(`Cảm ơn bạn đã liên hệ, ${real}`, 20_000), false, real);
+  }
+});
+
+test("a fragment of an accented word does not trigger the legacy intent rules either", () => {
+  assert.equal(classifyReply("Dạ ớharga thôi ạ"), classifyReply("Dạ thôi ạ"));
+  assert.equal(classifyReply("harga berapa kak"), "price");
+});

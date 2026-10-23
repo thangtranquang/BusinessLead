@@ -16,7 +16,9 @@ import { MarketingAiService } from "./marketing-ai.service";
 const SNAPSHOT_FILE = path.join(__dirname, "__snapshots__", "english-prompts.json");
 
 /** Entries a later slice is allowed to change on purpose. Empty until a slice names one together with its reason. */
+const RECIPIENT_LINE = "Review MEDIUM-1 (security): the recipient category line in the RULES section no longer interpolates scraped text; it points at the data block instead, so every outreach prompt changes by that one line.";
 const EXEMPT: Record<string, string> = {
+  ...Object.fromEntries(["outreach.whatsapp.first.pain", "outreach.whatsapp.first.observation", "outreach.whatsapp.first.outcome", "outreach.whatsapp.followup", "outreach.whatsapp.followup.last", "outreach.email.first", "outreach.email.followup", "outreach.generic", "outreach.whatsapp.service", "outreach.email.service", "outreach.noStyle"].map((k) => [k, RECIPIENT_LINE])),
   "leadNotes.english": "FR-46 / OG-4 (security fix): the lead-notes prompt now puts the scraped business name, address, industry and rating inside a <data_lead> block through clip() and carries SECURITY_RULE; it changes for English as well as Vietnamese.",
 };
 

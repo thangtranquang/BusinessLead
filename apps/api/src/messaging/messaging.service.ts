@@ -317,8 +317,9 @@ export class MessagingService {
       else if (!text.trim() || text.length > MAX_BODY) rejected.push({ id: m.id, reason: "invalid text" });
       else accept();
     }
-    if (ok.length) await this.prisma.outboundMessage.updateMany({ where: { id: { in: ok }, workspaceId, status: "draft" }, data: { status: "approved", approvedAt: new Date(), error: null } });
-    let approved = ok.length;
+    // the count of rows really moved (a draft approved or deleted by someone else in the meantime is not counted)
+    const batch = ok.length ? await this.prisma.outboundMessage.updateMany({ where: { id: { in: ok }, workspaceId, status: "draft" }, data: { status: "approved", approvedAt: new Date(), error: null } }) : { count: 0 };
+    let approved = batch?.count ?? 0;
     for (const f of fixes) {
       // ONE guarded write per message: the text, the NFC fix and the status change together, only if the draft still has the text
       // that was checked. If the owner edited it in the meantime nothing matches and the message stays a draft.

@@ -47,3 +47,13 @@ test("the first message greets with anh/chị and never guesses a gender (Vietna
   // English drafts are not rewritten by the Vietnamese rules (nor, any more, by Indonesian ones)
   assert.equal(tidyWhatsappOutreach("Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?", "english"), "Halo, Kak. Apakah Anda ingin berdiskusi tentang bisnis Anda?");
 });
+
+test("review MINOR-3: a Vietnamese greeting is split into its own paragraph, with and without diacritics", () => {
+  const body = "Em đến từ Công ty Mẫu. Bên em làm phần mềm đặt lịch cho quán cà phê. Anh/chị có cần xem thử không ạ? Em cảm ơn anh/chị.";
+  assert.equal(toWhatsapp("Xin chào anh/chị, " + body), "Xin chào anh/chị,\n\nEm đến từ Công ty Mẫu. Bên em làm phần mềm đặt lịch cho quán cà phê. Anh/chị có cần xem thử không ạ?\n\nEm cảm ơn anh/chị.");
+  assert.ok(toWhatsapp("Xin chao anh/chi, " + body).startsWith("Xin chao anh/chi,\n\n"));
+  assert.ok(toWhatsapp("Chào anh/chị, " + body).startsWith("Chào anh/chị,\n\n"));
+  assert.ok(toWhatsapp("Xin chào anh/chị, " + body.normalize("NFD")).startsWith("Xin chào anh/chị,\n\n".normalize("NFD")) || toWhatsapp("Xin chào anh/chị, " + body.normalize("NFD")).includes("\n\n"));
+  // not a greeting: the word is inside another word
+  assert.ok(!toWhatsapp("Chàoo anh. " + body).startsWith("Chàoo anh.\n\n"));
+});

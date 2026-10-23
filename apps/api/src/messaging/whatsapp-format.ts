@@ -4,6 +4,16 @@
  * This turns what the model wrote into clean WhatsApp text: valid spans kept, Markdown converted, stray symbols removed,
  * emphasis kept sparing, and paragraphs spaced so the message reads well on a phone.
  */
+import { wordRegex } from "../common/text";
+
+// Opening words of a first message. Unicode word boundaries (wordRegex), so "Xin chào" and "chào" are whole words whatever
+// the form of the diacritics; the Indonesian words are legacy tolerance for text written before the language change.
+const GREETING_WORDS = wordRegex(["halo", "hai", "hello", "selamat", "xin chào", "xin chao", "chào", "chao", "kính gửi", "kinh gui"], "iu");
+const VIETNAMESE_GREETING = wordRegex(["xin chào", "xin chao", "chào", "chao", "kính gửi", "kinh gui"], "iu");
+function startsWithGreeting(sentence: string): boolean {
+  return GREETING_WORDS.exec(sentence.normalize("NFC"))?.index === 0;
+}
+
 const MAX_BOLD = 4;
 const MAX_BOLD_LENGTH = 60;
 const MARK = "\u0001";
@@ -53,7 +63,17 @@ export function toWhatsapp(input: string): string {
   if (!text.includes("\n")) {
     const sentences = text.split(/(?<=[.!?])\s+/);
     if (sentences.length >= 4) {
-      const greeting = /^(halo|hai|hello|selamat)\b/i.test(sentences[0]) ? sentences.shift()! : "";
+      let greeting = "";
+      if (startsWithGreeting(sentences[0])) {
+        greeting = sentences.shift()!;
+        // a Vietnamese greeting is followed by a comma, not a full stop ("Xin chào anh/chị, em là ..."): only up to the comma is the greeting
+        const comma = greeting.indexOf(",");
+        if (comma > 0 && comma <= 40 && comma < greeting.length - 1 && VIETNAMESE_GREETING.test(greeting)) {
+          const rest = greeting.slice(comma + 1).trim();
+          greeting = greeting.slice(0, comma + 1);
+          sentences.unshift(rest.charAt(0).toUpperCase() + rest.slice(1));
+        }
+      }
       const closing = sentences.length >= 3 ? sentences.pop()! : "";
       text = [greeting, sentences.join(" "), closing].filter(Boolean).join("\n\n");
     }
