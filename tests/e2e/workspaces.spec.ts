@@ -9,7 +9,7 @@ const USER = {
   workspace: `First Business ${RUN}`,
 };
 const SECOND = `Second Business ${RUN}`;
-const SWITCHER = /Switch workspace|Ganti workspace/;
+const SWITCHER = /Switch workspace/;
 
 test.describe("Workspaces", () => {
   test("one login can create and switch between businesses", async ({ page }) => {
@@ -19,9 +19,9 @@ test.describe("Workspaces", () => {
 
     // Create a second business
     await switcher.click();
-    await page.getByRole("menuitem", { name: /New workspace|Workspace baru/ }).click();
+    await page.getByRole("menuitem", { name: /New workspace/ }).click();
     await page.fill("#new-workspace-name", SECOND);
-    await page.getByRole("button", { name: /Create and open|Buat dan buka/ }).click();
+    await page.getByRole("button", { name: /Create and open/ }).click();
     await page.waitForURL("/dashboard", { timeout: 15000 });
     await expect(page.getByRole("button", { name: SWITCHER })).toContainText(SECOND);
 

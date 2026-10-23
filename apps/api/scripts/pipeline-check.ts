@@ -5,6 +5,7 @@
  * workspace at the end, so it never touches real data and never competes with a live sender.
  * Every sender pass is limited to that workspace (`sender.tick(ws)`): the fake provider must never be handed another workspace's queue.
  */
+import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { InboundService } from "../src/messaging/inbound.service";
@@ -13,6 +14,11 @@ import { AttachmentService } from "../src/messaging/attachment.service";
 import { LeadsService } from "../src/leads/leads.service";
 import { AnalyticsService } from "../src/analytics/analytics.service";
 import { ReclassifyService } from "../src/messaging/reclassify.service";
+import { MessageWriterService } from "../src/messaging/message-writer.service";
+import { MessagingService } from "../src/messaging/messaging.service";
+import { OPT_OUT_HINT, STOP_REASON } from "../src/messaging/opt-out";
+import { LANGUAGE_LABEL } from "../src/common/language";
+import { OUTPUT_RULES } from "../src/ai/chat-import/style-prompt";
 import { ProviderUnavailableError, type InboundWhatsappMessage, type RoutedWhatsappProvider } from "../src/messaging/whatsapp.provider";
 
 let ws = "";
@@ -59,6 +65,7 @@ async function waitFor<T>(fn: () => Promise<T | null | undefined | false>, ms = 
 }
 
 async function main() {
+  Logger.overrideLogger(false); // only PASS/FAIL lines: the services' own log lines are not part of this report
   process.env.REPLY_DRAFT_DELAY_MS = "0"; // no 20 s wait before a reply draft in this check
   // CI turns the real senders off for the whole job, and ConfigService prefers process.env over the values passed below.
   delete process.env.WHATSAPP_DISABLED;
@@ -314,6 +321,66 @@ async function main() {
   await new SenderService(prisma, new ConfigService({ WHATSAPP_DISABLED: "false" }), wa, entitlements, new AttachmentService(prisma, new ConfigService({}))).onModuleInit();
   const rec = await prisma.outboundMessage.findUniqueOrThrow({ where: { id: stuck.id } });
   check("message stuck in 'sending' is marked failed, not resent", rec.status === "failed" && /interrupted/i.test(rec.error ?? ""), `status=${rec.status} error=${rec.error}`);
+
+  // 10. Vietnamese language support: drafting per campaign language, NFC owner edits, Vietnamese opt-out (AC-8)
+  type Chat = { role: string; content: string }[];
+  const prompts: string[] = [];
+  let canned = "";
+  const fakeAi = { enabled: true, chatModel: "fake", source: "workspace", chat: async (m: Chat) => { prompts.push(m.map((x) => x.content).join("\n")); return canned; } };
+  const writer = new MessageWriterService(
+    prisma,
+    { forWorkspace: async () => fakeAi } as never,
+    { search: async () => ({ confidence: "none", hits: [] }) } as never,
+    { retrieveExamples: async () => [] } as never,
+    { reserveDraft: async () => async () => undefined } as never,
+  );
+  const INDONESIAN_WORDS = /\b(?:bahasa|indonesia|saya|anda|kami|terima kasih|selamat|pelanggan|kakak)\b/i;
+  const leadFor = async (language: string, name: string) => {
+    const camp = await prisma.campaign.create({ data: { name: `lang-${language}`, industry: "x", location: "x", searchQueries: ["x"], yourService: "restaurant booking software", language, workspaceId: ws } });
+    return prisma.lead.create({ data: { name, workspaceId: ws, campaignId: camp.id, category: "restaurant" }, include: { campaign: true } });
+  };
+  canned = "Hi, I noticed Legacy Cafe has plenty of happy reviews. We help restaurants manage bookings in one place. Would a short demo be useful?";
+  const legacy = await leadFor("indonesian", "Legacy Cafe");
+  const legacyDraft = await writer.outreach(ws, legacy, undefined, "whatsapp");
+  // English is the unchanged baseline prompt (it names no language and has no output-rules block), so "asks for English" means it carries nothing Vietnamese
+  check("a legacy 'indonesian' campaign is drafted as English: the baseline English prompt, with no Vietnamese label or output rules", prompts.length >= 1 && !prompts[0].includes(LANGUAGE_LABEL.vietnamese) && !prompts[0].includes(OUTPUT_RULES.vietnamese.trim().slice(0, 40)) && /FIRST MESSAGE WhatsApp/.test(prompts[0]));
+  check("...with no Indonesian wording in any prompt", prompts.every((p) => !INDONESIAN_WORDS.test(p)));
+  check("...and the English opt-out line, not the Indonesian one", legacyDraft.text.endsWith(OPT_OUT_HINT.english) && !legacyDraft.text.includes("Kalau tidak berkenan"));
+  const promptsBefore = prompts.length;
+  canned = "Chào anh/chị, em thấy quán Cà phê Mẫu được nhiều khách đánh giá tốt. Bên em hỗ trợ quản lý đặt bàn cho nhà hàng. Anh/chị có muốn xem bản demo ngắn không ạ?";
+  const viLead = await leadFor("vietnamese", "Cà phê Mẫu");
+  const viDraft = await writer.outreach(ws, viLead, undefined, "whatsapp");
+  const viPrompt = prompts.slice(promptsBefore)[0] ?? "";
+  check("a Vietnamese campaign: the prompt asks for Vietnamese and carries the Vietnamese output rules", viPrompt.includes(LANGUAGE_LABEL.vietnamese) && viPrompt.includes(OUTPUT_RULES.vietnamese.trim().slice(0, 40)));
+  check("...and the draft ends with the Vietnamese opt-out line, in NFC", viDraft.text.endsWith(OPT_OUT_HINT.vietnamese) && viDraft.text === viDraft.text.normalize("NFC"));
+
+  // an owner edit typed in decomposed (NFD) form is stored, approved and sent as NFC bytes
+  const nfdBody = "Chào anh, bên em có thể gửi báo giá hôm nay ạ".normalize("NFD");
+  const messaging = new MessagingService(prisma, writer as never, wa, entitlements, new AttachmentService(prisma, new ConfigService({})));
+  const nfdMsg = await prisma.outboundMessage.create({ data: { workspaceId: ws, toPhone: "629900000031", body: "nháp", source: "manual", status: "draft" } });
+  await messaging.edit(ws, nfdMsg.id, nfdBody);
+  const stored = await prisma.outboundMessage.findUniqueOrThrow({ where: { id: nfdMsg.id } });
+  check("an NFD owner edit is stored as NFC bytes", stored.body === nfdBody.normalize("NFC") && Buffer.from(stored.body).equals(Buffer.from(nfdBody.normalize("NFC"), "utf8")) && stored.body.length < nfdBody.length);
+  check("...and approving it works", (await messaging.approve(ws, [nfdMsg.id])).approved === 1);
+  await prisma.whatsappAccount.update({ where: { workspaceId: ws }, data: { paused: false, nextSendAt: null, hourlyLimit: 30, quietStartHour: 0, quietEndHour: 0 } });
+  wa.mode = "ok";
+  const sentBefore = wa.sent.length;
+  await sender.tick(ws);
+  const out = wa.sent[sentBefore];
+  check("...and what reaches WhatsApp is NFC", !!out && out.to.startsWith("629900000031") && Buffer.from(out.text).equals(Buffer.from(nfdBody.normalize("NFC"), "utf8")));
+
+  // Vietnamese opt-out from a lead: blocked with the Vietnamese reason; an ordinary sentence is not an opt-out
+  const viStop = await mk("Khách dừng", "629900000032");
+  await inbound.handle(ws, { phone: "629900000032", text: "dừng gửi tin nhắn cho tôi nhé", id: "vi-stop-1", at: new Date() });
+  const viStopLead = await prisma.lead.findUniqueOrThrow({ where: { id: viStop.id } });
+  check("a Vietnamese opt-out closes the lead with STOP_REASON", viStopLead.crmStatus === "lost" && viStopLead.lostReason === STOP_REASON);
+  check("...and blocks the number", !!(await prisma.messageOptOut.findUnique({ where: { workspaceId_phone: { workspaceId: ws, phone: "629900000032" } } })));
+  const viKeep = await mk("Khách hỏi giá", "629900000033");
+  await inbound.handle(ws, { phone: "629900000033", text: "Đúng, gửi giúp em báo giá", id: "vi-keep-1", at: new Date() });
+  check("'Đúng, gửi giúp em báo giá' is not an opt-out", !(await prisma.messageOptOut.findUnique({ where: { workspaceId_phone: { workspaceId: ws, phone: "629900000033" } } })) && (await prisma.lead.findUniqueOrThrow({ where: { id: viKeep.id } })).crmStatus !== "lost");
+  await prisma.outboundMessage.updateMany({ where: { workspaceId: ws, status: { in: ["draft", "approved"] } }, data: { status: "cancelled" } });
+
+  await sleep(1000); // reply drafts for the inbound messages above are written a moment later; let them finish before the workspace goes
 
   // cleanup: deleting the workspace removes everything this run created
   await prisma.workspace.delete({ where: { id: ws } });
