@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
+import { toApiLanguage } from "@/lib/i18n/lang";
 import { BriefSections } from "./brief-sections";
 import { SourceMaterial } from "./source-material";
 import { hasBrief, type Brief, type BriefContent, type BriefResponse } from "./types";
@@ -18,6 +20,7 @@ import { generateBrief } from "@/lib/generate-brief";
  */
 export function BriefPage() {
   const { t, lang } = useI18n();
+  const f = useFormat();
   const [brief, setBrief] = useState<Brief | null | undefined>(undefined);
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -38,7 +41,7 @@ export function BriefPage() {
   const generate = async () => {
     setBusy(true);
     try {
-      const b = await generateBrief<Brief>({ sourceIds: selected.length ? selected : undefined, notes: notes || undefined, language: lang === "id" ? "indonesian" : "english" });
+      const b = await generateBrief<Brief>({ sourceIds: selected.length ? selected : undefined, notes: notes || undefined, language: toApiLanguage(lang) });
       setBrief(b);
       setSummary(b.summary);
     } catch (e) { toast.error(t("mkt.gen.failed", { err: (e as Error).message })); } finally { setBusy(false); }
@@ -88,7 +91,7 @@ export function BriefPage() {
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">{t("mkt.brief.version", { n: brief.version, date: new Date(brief.updatedAt).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { dateStyle: "medium" }) })}</p>
+            <p className="text-xs text-muted-foreground">{t("mkt.brief.version", { n: brief.version, date: f.date(brief.updatedAt, { dateStyle: "medium" }) })}</p>
             <div className="flex gap-2">
               {editing ? (
                 <>

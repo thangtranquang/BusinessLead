@@ -1,30 +1,20 @@
 /**
- * All dictionaries in one place. English is the source of truth: every Indonesian entry is typed against
+ * All dictionaries in one place. English is the source of truth: every Vietnamese entry is typed against
  * the matching English object, so a missing translation is a compile error.
- * Core strings live in en.ts / id.ts; each feature owns its own pair of files (features-<name>.en.ts / .id.ts).
+ * Core strings live in en.ts / vi.ts; each feature owns its own pair of files (features-<name>.en.ts / .vi.ts).
+ * Vietnamese wording follows docs/i18n-vi-glossary.md.
  */
 import { en } from "./en";
-import { id } from "./id";
 import { authEn } from "./features-auth.en";
-import { authId } from "./features-auth.id";
 import { campaignsEn } from "./features-campaigns.en";
-import { campaignsId } from "./features-campaigns.id";
 import { leadsEn } from "./features-leads.en";
-import { leadsId } from "./features-leads.id";
 import { adminEn } from "./features-admin.en";
 import { marketingEn } from "./features-marketing.en";
-import { marketingId } from "./features-marketing.id";
-import { adminId } from "./features-admin.id";
 import { workspaceEn } from "./features-workspace.en";
-import { workspaceId } from "./features-workspace.id";
 import { billingEn } from "./features-billing.en";
-import { billingId } from "./features-billing.id";
 import { pipelineEn } from "./features-pipeline.en";
-import { pipelineId } from "./features-pipeline.id";
 import { templatesEn } from "./features-templates.en";
-import { templatesId } from "./features-templates.id";
 import { knowledgeEn } from "./features-knowledge.en";
-import { knowledgeId } from "./features-knowledge.id";
 import { vi } from "./vi";
 import { authVi } from "./features-auth.vi";
 import { campaignsVi } from "./features-campaigns.vi";
@@ -39,6 +29,4 @@ import { knowledgeVi } from "./features-knowledge.vi";
 
 export const enAll = { ...en, ...authEn, ...campaignsEn, ...leadsEn, ...adminEn, ...marketingEn, ...workspaceEn, ...billingEn, ...pipelineEn, ...templatesEn, ...knowledgeEn } as const;
 export type MessageKey = keyof typeof enAll;
-export const idAll: Record<MessageKey, string> = { ...id, ...authId, ...campaignsId, ...leadsId, ...adminId, ...marketingId, ...workspaceId, ...billingId, ...pipelineId, ...templatesId, ...knowledgeId };
-/** Vietnamese dictionary (docs/i18n-vi-glossary.md). Added next to idAll; idAll goes away in the web language flip. */
 export const viAll: Record<MessageKey, string> = { ...vi, ...authVi, ...campaignsVi, ...leadsVi, ...adminVi, ...marketingVi, ...workspaceVi, ...billingVi, ...pipelineVi, ...templatesVi, ...knowledgeVi };

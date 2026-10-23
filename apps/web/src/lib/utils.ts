@@ -10,14 +10,6 @@ export function formatNumber(n: number): string {
   return n.toString();
 }
 
-export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export function getInitials(name: string): string {
   return name
     .split(" ")

@@ -5,18 +5,21 @@ import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
+import { effectiveOutputLanguage } from "@/lib/i18n/lang";
 import type { MessageKey } from "@/lib/i18n/messages";
 import type { Campaign } from "@/hooks/use-campaigns";
 
 const IND = ["restaurant", "cafe", "retail", "automotive", "healthcare", "beauty", "education", "realestate", "event", "tech", "professional"];
 const STYLES = ["professional", "friendly", "balanced", "casual"];
-const LANGS = ["indonesian", "english"];
+const LANGS = ["vietnamese", "english"];
 
 /** What this campaign was set up to do: the offer, where it looks, how it writes. */
 export function CampaignConfig({ campaign }: { campaign: Campaign & { maxResults?: number } }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const label = (prefix: string, values: string[], v: string) => (values.includes(v) ? t(`${prefix}.${v}` as MessageKey) : v);
-  const date = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { year: "numeric", month: "short", day: "numeric" }) : "—");
+  const date = (iso?: string) => f.date(iso, { year: "numeric", month: "short", day: "numeric" }) || "—";
   const queries = campaign.searchQueries?.length ? campaign.searchQueries : campaign.searchQuery ? [campaign.searchQuery] : [];
 
   const rows: [string, string][] = [
@@ -24,7 +27,7 @@ export function CampaignConfig({ campaign }: { campaign: Campaign & { maxResults
     [t("camp.cfg.location"), campaign.location],
     [t("camp.cfg.maxResults"), campaign.maxResults ? t("camp.form.leadsCount", { n: campaign.maxResults }) : "—"],
     [t("camp.cfg.style"), label("camp.style", STYLES, campaign.contentStyle)],
-    [t("camp.cfg.language"), label("camp.lang", LANGS, campaign.language)],
+    [t("camp.cfg.language"), label("camp.lang", LANGS, effectiveOutputLanguage(campaign.language))],
     [t("camp.cfg.created"), date(campaign.createdAt)],
     [t("camp.cfg.completed"), date(campaign.completedAt)],
   ];

@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { useI18n, type Lang } from "@/lib/i18n";
 
 const options: { value: Lang; label: string; name: string }[] = [
-  { value: "id", label: "ID", name: "Bahasa Indonesia" },
   { value: "en", label: "EN", name: "English" },
+  { value: "vi", label: "VI", name: "Tiếng Việt" },
 ];
 
 export function LanguageToggle() {

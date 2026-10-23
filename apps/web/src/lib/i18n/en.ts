@@ -1,4 +1,4 @@
-/** English is the source of truth: Indonesian must define every key (enforced by the type). */
+/** English is the source of truth: Vietnamese must define every key (enforced by the type). */
 export const en = {
   "nav.dashboard": "Dashboard",
   "nav.campaigns": "Campaigns",

@@ -58,7 +58,7 @@ export const campaignsEn = {
   "camp.style.friendly": "Friendly",
   "camp.style.balanced": "Balanced",
   "camp.style.casual": "Casual",
-  "camp.lang.indonesian": "Indonesian",
+  "camp.lang.vietnamese": "Vietnamese",
   "camp.lang.english": "English",
   "camp.cfg.title": "Campaign setup",
   "camp.cfg.offer": "What you offer",

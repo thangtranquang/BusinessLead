@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LicenseCard } from "./license-card";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 export interface PlanInfo {
@@ -40,10 +41,10 @@ interface Catalog {
   plans: PlanInfo[];
 }
 
-const idr = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
-
 export function BillingPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
+  const idr = (n: number) => `Rp${f.number(n)}`;
   const [sub, setSub] = useState<Entitlements | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null | undefined>(undefined);
   const [error, setError] = useState("");
@@ -101,7 +102,7 @@ export function BillingPage() {
             <Badge variant={sub.readOnly ? "destructive" : "secondary"}>{t(`billing.status.${sub.status}` as MessageKey)}</Badge>
           </CardTitle>
           <CardDescription>
-            {sub.status === "trialing" && daysLeft !== null ? t("billing.trialLeft", { days: daysLeft }) : ends ? t("billing.endsAt", { date: ends.toLocaleDateString(lang === "id" ? "id-ID" : "en-US") }) : null}
+            {sub.status === "trialing" && daysLeft !== null ? t("billing.trialLeft", { days: daysLeft }) : ends ? t("billing.endsAt", { date: f.date(ends) }) : null}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -132,7 +133,7 @@ export function BillingPage() {
               <CardContent className="space-y-1.5 text-sm">
                 <Line>{t("billing.workspacesN", { n: p.limits.workspaces })}</Line>
                 <Line>{t("billing.membersN", { n: p.limits.membersPerWorkspace })}</Line>
-                <Line>{t("billing.draftsN", { n: p.limits.draftsPerMonth.toLocaleString("id-ID") })}</Line>
+                <Line>{t("billing.draftsN", { n: f.number(p.limits.draftsPerMonth) })}</Line>
                 {p.features.includes("whatsapp.cloud_api") && <Line>{t("billing.officialWa")}</Line>}
               </CardContent>
             </Card>

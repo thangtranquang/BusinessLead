@@ -21,6 +21,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { getInitials } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 
 interface ApiKey {
   id: string;
@@ -63,9 +64,9 @@ interface AiTestResult {
 
 export function SettingsPage() {
   const { user } = useAuth();
-  const { t, lang } = useI18n();
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "short", day: "numeric", year: "numeric" });
+  const { t } = useI18n();
+  const f = useFormat();
+  const formatDate = (d: string) => f.date(d, { month: "short", day: "numeric", year: "numeric" });
   const withBold = (key: "settings.dialog.key.desc" | "settings.dialog.ws.desc", name: string) => {
     const [a, b] = t(key, { name: "\u0001" }).split("\u0001");
     return <>{a}<strong>{name}</strong>{b}</>;

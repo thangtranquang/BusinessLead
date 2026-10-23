@@ -12,6 +12,7 @@ import { LinkPreviewControl, firstUrl } from "./link-preview-card";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { toApiLanguage } from "@/lib/i18n/lang";
 
 /* Hallmark · component: panel (template broadcast) · genre: modern-minimal · theme: existing Prospex tokens
  * layout: one collapsible card, three numbered steps · no new colours or fonts
@@ -60,7 +61,7 @@ export function TemplatePanel({ channel, onCreated }: { channel: Channel; onCrea
     if (!category) { toast.info(t("tpl.needCategory")); return; }
     setWriting(true);
     try {
-      const r = await api.post<{ body: string; subject?: string; risks: string[] }>("/messaging/templates/generate", { segment: category, channel, language: lang === "id" ? "indonesian" : "english" });
+      const r = await api.post<{ body: string; subject?: string; risks: string[] }>("/messaging/templates/generate", { segment: category, channel, language: toApiLanguage(lang) });
       setBody(r.body);
       if (r.subject) setSubject(r.subject);
       if (r.risks.length) toast.info(t("tpl.aiRisk", { risks: r.risks.join(", ") }));
@@ -71,7 +72,7 @@ export function TemplatePanel({ channel, onCreated }: { channel: Channel; onCrea
     setCreating(true);
     try {
       const r = await api.post<{ created: number; skipped: { noContact: number; optedOut: number; alreadyMessaged: number } }>("/messaging/templates/apply", {
-        channel, leadIds: [...picked], body, ...(channel === "email" ? { subject } : {}), language: lang === "id" ? "indonesian" : "english",
+        channel, leadIds: [...picked], body, ...(channel === "email" ? { subject } : {}), language: toApiLanguage(lang),
         ...(channel === "whatsapp" ? { ...(attachmentId ? { attachmentId } : {}), ...(cardChoice !== null ? { linkPreview: cardChoice } : {}) } : {}),
       });
       toast.success(t("tpl.created", { n: r.created }));

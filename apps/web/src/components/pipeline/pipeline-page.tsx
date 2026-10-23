@@ -10,6 +10,7 @@ import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 interface LeadRow { id: string; name: string; phone: string | null; category: string | null; crmStatus: string; dealValue: number | null; lastIntent: string | null; repliedAt: string | null; contactedAt: string | null; followUpDate: string | null }
@@ -28,7 +29,6 @@ interface Pipeline {
   campaigns: { id: string; name: string; total: number; contacted: number; replied: number; won: number }[];
 }
 
-const money = (n: number) => n.toLocaleString("id-ID");
 interface Reclassified {
   applied: boolean; scanned: number; changed: number; answeredByOwner: number; intentChanged: number; stageMoved: number; botOnly: number; optedOut: number; incomplete: number; draftsWithdrawn: number; draftsRewritten: number;
   sample: { leadId: string; name: string; answeredByOwner: boolean; botOnly: boolean; optOut: boolean; intent: { from: string | null; to: string }; stage: { from: string; to: string }; staleDrafts: number }[];
@@ -101,7 +101,9 @@ function ReclassifyPanel({ onDone }: { onDone: () => void }) {
 const pct = (n: number | null) => (n === null ? "—" : `${n}%`);
 
 export function PipelinePage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
+  const money = (n: number) => f.number(n);
   const [data, setData] = useState<Pipeline | null>(null);
   const [error, setError] = useState(false);
 
@@ -115,18 +117,17 @@ export function PipelinePage() {
   if (!data) return <div className="space-y-4 p-6"><Skeleton className="h-24 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   const max = Math.max(1, ...data.stages.map((s) => s.count));
-  // "2 jam yang lalu" / "3 days ago": how long it has been, which is what decides who to look at first
+  // "2 giờ trước" / "3 days ago": how long it has been, which is what decides who to look at first
   const ago = (v: string | null) => {
     if (!v) return "";
     const mins = Math.round((new Date(v).getTime() - Date.now()) / 60_000);
-    const rtf = new Intl.RelativeTimeFormat(lang === "id" ? "id" : "en", { numeric: "auto" });
-    if (Math.abs(mins) < 60) return rtf.format(mins, "minute");
-    if (Math.abs(mins) < 1440) return rtf.format(Math.round(mins / 60), "hour");
-    return rtf.format(Math.round(mins / 1440), "day");
+    if (Math.abs(mins) < 60) return f.relative(mins, "minute");
+    if (Math.abs(mins) < 1440) return f.relative(Math.round(mins / 60), "hour");
+    return f.relative(Math.round(mins / 1440), "day");
   };
   const intentBadge = (l: LeadRow): { label: string; tone: BadgeTone } | null =>
     l.lastIntent ? { label: t(`pipeline.intent.${l.lastIntent}` as MessageKey), tone: INTENT_TONE[l.lastIntent] ?? "secondary" } : null;
-  const date = (v: string | null) => (v ? new Date(v).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "numeric", month: "short" }) : "");
+  const date = (v: string | null) => f.date(v, { day: "numeric", month: "short" });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">

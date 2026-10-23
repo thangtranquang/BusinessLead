@@ -18,6 +18,7 @@ import { Plus, Search, Megaphone, MapPin, Users, Star, MoreHorizontal, Loader2, 
 import { useCampaigns, type Campaign } from "@/hooks/use-campaigns";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 
 const container = {
   hidden: { opacity: 0 },
@@ -43,7 +44,8 @@ function StatusBadge({ campaign }: { campaign: Campaign }) {
 }
 
 export function CampaignsList() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const { campaigns, loading } = useCampaigns();
   const [search, setSearch] = useState("");
 
@@ -111,7 +113,7 @@ export function CampaignsList() {
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1 capitalize"><Megaphone className="w-3 h-3" />{c.industry}</span>
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{c.location}</span>
-                        <span className="hidden sm:block">{new Date(c.createdAt).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                        <span className="hidden sm:block">{f.date(c.createdAt, { month: "short", day: "numeric", year: "numeric" })}</span>
                       </div>
                       {c.status === "running" && (
                         <Progress value={c.progress} className="h-1 mt-2 max-w-[200px]" />

@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 
 interface Overview {
   totalLeads: number;
@@ -56,8 +57,8 @@ const STATUS_KEYS = {
 } as const;
 
 export function AnalyticsDashboard() {
-  const { t, lang } = useI18n();
-  const locale = lang === "id" ? "id-ID" : "en-US";
+  const { t } = useI18n();
+  const f = useFormat();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [industries, setIndustries] = useState<IndustryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +120,7 @@ export function AnalyticsDashboard() {
   }
 
   const stats = [
-    { label: t("analytics.stat.totalLeads"), value: overview?.totalLeads.toLocaleString(locale) ?? "0" },
+    { label: t("analytics.stat.totalLeads"), value: f.number(overview?.totalLeads) || "0" },
     { label: t("analytics.stat.conversionRate"), value: overview?.conversionRate ?? "0%" },
     { label: t("analytics.stat.dealsWon"), value: overview?.dealsWon.toString() ?? "0" },
     { label: t("analytics.stat.activeCampaigns"), value: overview?.activeCampaigns.toString() ?? "0" },

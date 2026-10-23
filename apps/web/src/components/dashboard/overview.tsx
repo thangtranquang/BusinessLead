@@ -11,6 +11,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useCampaigns } from "@/hooks/use-campaigns";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 
 const container = {
   hidden: { opacity: 0 },
@@ -29,8 +30,8 @@ interface Overview {
 }
 
 export function DashboardOverview() {
-  const { t, lang } = useI18n();
-  const locale = lang === "id" ? "id-ID" : "en-US";
+  const { t } = useI18n();
+  const f = useFormat();
   const { campaigns, loading } = useCampaigns();
   const recent = campaigns.slice(0, 4);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -47,7 +48,7 @@ export function DashboardOverview() {
   );
 
   const stats = [
-    { title: t("dash.stat.totalLeads"), value: overview?.totalLeads.toLocaleString() ?? "—", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { title: t("dash.stat.totalLeads"), value: f.number(overview?.totalLeads) || "—", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
     { title: t("dash.stat.activeCampaigns"), value: overview?.activeCampaigns.toString() ?? "—", icon: Megaphone, color: "text-purple-500", bg: "bg-purple-500/10" },
     { title: t("dash.stat.conversionRate"), value: overview?.conversionRate ?? "—", icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { title: t("dash.stat.dealsWon"), value: overview?.dealsWon.toString() ?? "—", icon: Trophy, color: "text-amber-500", bg: "bg-amber-500/10" },
@@ -55,7 +56,7 @@ export function DashboardOverview() {
 
   // Build trend from campaign data (campaigns per week by createdAt)
   const trendData = campaigns.slice(-6).map((c) => ({
-    date: new Date(c.createdAt).toLocaleDateString(locale, { month: "short", day: "numeric" }),
+    date: f.date(c.createdAt, { month: "short", day: "numeric" }),
     leads: c.totalLeads,
     won: c.priorityLeads,
   }));
@@ -189,7 +190,7 @@ export function DashboardOverview() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{c.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {t("dash.recent.leadsCount", { n: c.totalLeads })} · {new Date(c.createdAt).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}
+                        {t("dash.recent.leadsCount", { n: c.totalLeads })} · {f.date(c.createdAt, { month: "short", day: "numeric", year: "numeric" })}
                       </p>
                     </div>
                     {c.status === "running" && (

@@ -60,8 +60,7 @@ export const campaignsVi: Record<keyof typeof campaignsEn, string> = {
   "camp.style.friendly": "Thân thiện",
   "camp.style.balanced": "Cân bằng",
   "camp.style.casual": "Thoải mái",
-  // Temporary: Slice 4 renames this key to camp.lang.vietnamese; until then the old key carries the Vietnamese label.
-  "camp.lang.indonesian": "Tiếng Việt",
+  "camp.lang.vietnamese": "Tiếng Việt",
   "camp.lang.english": "Tiếng Anh",
   "camp.cfg.title": "Thiết lập chiến dịch",
   "camp.cfg.offer": "Bạn cung cấp gì",

@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
+import { toApiLanguage, type Format } from "@/lib/i18n/lang";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 /* Hallmark · component: page (AI Style) · genre: modern-minimal · theme: existing Prospex tokens
@@ -31,7 +33,7 @@ type Busy = "" | "inspect" | "train" | "draft";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const size = (b: number) => (b > 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1000))} KB`);
-const day = (iso: string | null, lang = "en") => (iso ? new Date(iso).toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { year: "numeric", month: "short", day: "numeric" }) : "?");
+const day = (f: Format, iso: string | null) => f.date(iso, { year: "numeric", month: "short", day: "numeric" }) || "?";
 
 export function StylePage() {
   const { t, lang } = useI18n();
@@ -88,7 +90,7 @@ export function StylePage() {
   const draft = async () => {
     if (!incoming.trim() || busy) return;
     setBusy("draft");
-    try { setResult(await api.post("/style/draft", { incoming })); }
+    try { setResult(await api.post("/style/draft", { incoming, language: toApiLanguage(lang) })); }
     catch (e) { toast.error((e as Error).message); } finally { setBusy(""); }
   };
 
@@ -164,7 +166,8 @@ function Importer(props: {
   me: string; setMe: (s: string) => void; busy: Busy; inspect: () => void; train: () => void; first: boolean;
 }) {
   const { files, pick, remove, inspected, me, setMe, busy, inspect, train, first } = props;
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
 
@@ -236,8 +239,8 @@ function Importer(props: {
             <div>
               <h2 className="text-base font-semibold">{t("style.import.whoTitle")}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {t("style.import.summary", { messages: inspected.reduce((n, r) => n + r.messages, 0).toLocaleString(), files: inspected.length })}
-                {inspected[0]?.from && <> · {day(inspected.map((r) => r.from).filter(Boolean).sort()[0] ?? null, lang)} – {day(inspected.map((r) => r.to).filter(Boolean).sort().at(-1) ?? null, lang)}</>}
+                {t("style.import.summary", { messages: f.number(inspected.reduce((n, r) => n + r.messages, 0)), files: inspected.length })}
+                {inspected[0]?.from && <> · {day(f, inspected.map((r) => r.from).filter(Boolean).sort()[0] ?? null)} – {day(f, inspected.map((r) => r.to).filter(Boolean).sort().at(-1) ?? null)}</>}
               </p>
             </div>
             <div role="radiogroup" aria-label={t("style.import.whoLabel")} className="space-y-1.5">
@@ -254,7 +257,7 @@ function Importer(props: {
                       {on && <Check className="h-3 w-3" />}
                     </span>
                     <span className="relative min-w-0 flex-1 truncate font-medium">{name}</span>
-                    <span className="relative font-mono text-xs tabular-nums text-muted-foreground">{n.toLocaleString()}</span>
+                    <span className="relative font-mono text-xs tabular-nums text-muted-foreground">{f.number(n)}</span>
                   </button>
                 );
               })}
@@ -299,7 +302,8 @@ function Words({ title, words }: { title: string; words: string[] }) {
 }
 
 function VoiceProfile({ profile }: { profile: Profile }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const s = profile.stats;
   return (
     <aside aria-label={t("style.voiceOf")} className="space-y-5 lg:sticky lg:top-6 lg:self-start">
@@ -307,7 +311,7 @@ function VoiceProfile({ profile }: { profile: Profile }) {
         <div className="text-xs text-muted-foreground">{t("style.voiceOf")}</div>
         <div className="truncate text-lg font-semibold">{profile.ownerName}</div>
         <div className="mt-0.5 text-xs text-muted-foreground">
-          {t("style.stats.line", { messages: profile.messageCount.toLocaleString(), examples: profile.exampleCount.toLocaleString(), date: day(profile.updatedAt, lang) })}
+          {t("style.stats.line", { messages: f.number(profile.messageCount), examples: f.number(profile.exampleCount), date: day(f, profile.updatedAt) })}
         </div>
       </div>
 

@@ -1,3 +1,5 @@
+import type { OutputLanguage } from "@/lib/i18n/lang";
+
 export interface Source {
   id: string;
   title: string;
@@ -32,7 +34,7 @@ export interface CampaignSuggestion {
   location: string;
   searchQueries: string[];
   contentStyle: "professional" | "friendly" | "balanced" | "casual";
-  language: "indonesian" | "english";
+  language: OutputLanguage;
 }
 
 export interface Brief {

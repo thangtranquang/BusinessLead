@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { effectiveOutputLanguage } from "@/lib/i18n/lang";
 import { SourceMaterial } from "@/components/marketing/source-material";
 import { hasBrief, type Brief, type BriefResponse } from "@/components/marketing/types";
 import { toast } from "sonner";
@@ -37,7 +38,7 @@ export function CreateCampaignForm() {
     yourService: "",
     maxResults: "20",
     contentStyle: "balanced",
-    language: "indonesian",
+    language: "vietnamese", // the form defaults to Vietnamese whatever the UI language is
   });
 
   const mark = (k: string) => {
@@ -67,7 +68,8 @@ export function CreateCampaignForm() {
       if (c?.location && free("location")) { n.location = c.location; filled.add("location"); }
       if (b.summary && free("yourService")) { n.yourService = b.summary; filled.add("yourService"); }
       if (c?.contentStyle && free("contentStyle")) { n.contentStyle = c.contentStyle; filled.add("contentStyle"); }
-      if (c?.language && free("language")) { n.language = c.language; filled.add("language"); }
+      // the brief's own language column (what the brief page shows), not the suggestion's copy of it; a legacy value reads as english
+      if (b.language && free("language")) { n.language = effectiveOutputLanguage(b.language); filled.add("language"); }
       return n;
     });
     if (c?.searchQueries?.length && free("queries")) { setQueries(c.searchQueries); filled.add("queries"); }
@@ -82,7 +84,7 @@ export function CreateCampaignForm() {
         notes: [notes, !touched.has("yourService") ? "" : form.yourService].filter(Boolean).join("\n\n") || undefined,
         industry: touched.has("industry") ? form.industry || undefined : undefined,
         location: touched.has("location") ? form.location || undefined : undefined,
-        language: form.language === "english" ? "english" : "indonesian",
+        language: effectiveOutputLanguage(form.language),
       }, setPass);
       applyBrief(b);
       toast.success(t("mkt.gen.done"));
@@ -276,7 +278,7 @@ export function CreateCampaignForm() {
               <Select value={form.language} onValueChange={pick("language")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="indonesian">{t("camp.lang.indonesian")}</SelectItem>
+                  <SelectItem value="vietnamese">{t("camp.lang.vietnamese")}</SelectItem>
                   <SelectItem value="english">{t("camp.lang.english")}</SelectItem>
                 </SelectContent>
               </Select>

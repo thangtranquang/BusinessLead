@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { I18nProvider } from "@/lib/i18n";
 import { LANG_COOKIE, parseLang } from "@/lib/i18n/lang";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 export const metadata: Metadata = {
   title: "Prospex — AI-Powered GTM Automation",

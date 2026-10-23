@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 
 /* Hallmark · component: page (Knowledge base) · genre: modern-minimal · theme: existing Prospex tokens
  * layout: add form + source list (one column) + test search panel · no new colours or fonts
@@ -43,6 +44,7 @@ const KIND_OPTIONS = ["text", "pricing", "faq", "policy"] as const;
 
 export function KnowledgePage() {
   const { t } = useI18n();
+  const f = useFormat();
   const [sources, setSources] = useState<KnowledgeSource[] | null>(null);
 
   // add form
@@ -185,7 +187,7 @@ export function KnowledgePage() {
                   className="resize-y font-mono text-xs"
                   required
                 />
-                <p className="text-right text-xs text-muted-foreground tabular-nums">{content.length.toLocaleString()} / 200,000</p>
+                <p className="text-right text-xs text-muted-foreground tabular-nums">{f.number(content.length)} / {f.number(200000)}</p>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" size="sm" disabled={adding || !title.trim() || !content.trim()}>

@@ -11,6 +11,7 @@ import { AttachmentPicker } from "./attachment-picker";
 import { LinkPreviewControl, firstUrl } from "./link-preview-card";
 import { WhatsappBubble } from "./whatsapp-bubble";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 import type { OutboxMessage } from "./types";
 
 interface Props {
@@ -25,7 +26,8 @@ interface Props {
 }
 
 export function MessageCard({ m, position, busy, onApprove, onReject, onCancel, onRetry, onSave }: Props) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(m.body);
   const [subject, setSubject] = useState(m.subject ?? "");
@@ -58,7 +60,7 @@ export function MessageCard({ m, position, busy, onApprove, onReject, onCancel, 
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {position !== undefined && <span className="font-mono tabular-nums">{t("outbox.queue.position", { n: position })}</span>}
-          {m.status === "sent" && m.sentAt && <span>{t("outbox.sentAt", { time: new Date(m.sentAt).toLocaleString(lang === "id" ? "id-ID" : "en-US", { dateStyle: "medium", timeStyle: "short" }) })}</span>}
+          {m.status === "sent" && m.sentAt && <span>{t("outbox.sentAt", { time: f.dateTime(m.sentAt) })}</span>}
           <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground">{t(sourceKey)}{followUp}</span>
         </div>
       </div>

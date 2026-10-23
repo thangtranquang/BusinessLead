@@ -191,13 +191,12 @@ test.describe("TC-3.6 no Indonesian left, real Vietnamese", () => {
 });
 
 test.describe("TC-3.7 language labels", () => {
-  test("Vietnamese and English labels", () => {
-    // Slice 4 renames camp.lang.indonesian to camp.lang.vietnamese; until then the old key carries the Vietnamese label.
-    const enVietnamese = en["camp.lang.vietnamese"] ?? en["camp.lang.indonesian"];
-    const viVietnamese = vi["camp.lang.vietnamese"] ?? vi["camp.lang.indonesian"];
-    expect(viVietnamese).toBe("Tiếng Việt");
-    expect(vi["camp.lang.english"]).toBe("Tiếng Anh");
+  test("Vietnamese and English labels, and the old key is gone", () => {
+    expect(en["camp.lang.vietnamese"]).toBe("Vietnamese");
     expect(en["camp.lang.english"]).toBe("English");
-    expect(typeof enVietnamese).toBe("string");
+    expect(vi["camp.lang.vietnamese"]).toBe("Tiếng Việt");
+    expect(vi["camp.lang.english"]).toBe("Tiếng Anh");
+    expect("camp.lang.indonesian" in en).toBe(false);
+    expect("camp.lang.indonesian" in vi).toBe(false);
   });
 });

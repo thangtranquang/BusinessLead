@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { enAll, idAll, type MessageKey } from "./messages";
-import { LANG_COOKIE, type Lang } from "./lang";
+import { enAll, viAll, type MessageKey } from "./messages";
+import { LANG_COOKIE, rawLangCookie, shouldWriteLangCookie, type Lang } from "./lang";
 
 export type { Lang };
 
-const dictionaries: Record<Lang, Record<MessageKey, string>> = { en: enAll, id: idAll };
+const dictionaries: Record<Lang, Record<MessageKey, string>> = { en: enAll, vi: viAll };
 
 interface I18n {
   lang: Lang;
@@ -21,12 +21,19 @@ export function I18nProvider({ initial, children }: { initial: Lang; children: R
   const [lang, setLangState] = useState<Lang>(initial);
 
   const setLang = useCallback((l: Lang) => {
+    // Clicking the active option does nothing only when the RAW cookie already holds it. A legacy, invalid or
+    // missing cookie still shows English, and a click on EN must replace it, so compare the raw value, not `lang`.
+    let raw: string | null = null;
+    try { raw = rawLangCookie(document.cookie); } catch { /* cookies unreadable: treat as missing */ }
+    if (!shouldWriteLangCookie(raw, l, lang)) return;
     setLangState(l);
     try {
       document.cookie = `${LANG_COOKIE}=${l}; path=/; max-age=31536000; samesite=lax`;
-      document.documentElement.lang = l;
     } catch { /* cookies blocked: the choice only lasts for this session */ }
-  }, []);
+    try {
+      document.documentElement.lang = l;
+    } catch { /* no document: nothing to update */ }
+  }, [lang]);
 
   const t = useCallback<I18n["t"]>(
     (key, vars) => {

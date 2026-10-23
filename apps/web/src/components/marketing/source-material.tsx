@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 import type { Source } from "./types";
 
 type Tab = "url" | "text" | "file";
@@ -18,7 +19,8 @@ type Tab = "url" | "text" | "file";
  * (the whole site through its sitemap and llms.txt), so this list polls while anything is still being read.
  */
 export function SourceMaterial({ selected, onSelected, onLoaded }: { selected: string[]; onSelected: (ids: string[]) => void; onLoaded?: (sources: Source[]) => void }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const [sources, setSources] = useState<Source[] | null>(null);
   const [tab, setTab] = useState<Tab>("url");
   const [url, setUrl] = useState("");
@@ -146,7 +148,7 @@ export function SourceMaterial({ selected, onSelected, onLoaded }: { selected: s
                   <div className="truncate text-sm font-medium">{shownTitle(s)}</div>
                   <div className={cn("flex items-center gap-1 truncate text-xs", st.tone)}>
                     <Icon className={cn("h-3 w-3 shrink-0", Icon === Loader2 && "animate-spin")} />{st.text}
-                    <span className="text-muted-foreground">· {t("mkt.src.addedOn", { date: new Date(s.createdAt).toLocaleString(lang === "id" ? "id-ID" : "en-US", { dateStyle: "medium" }) })}</span>
+                    <span className="text-muted-foreground">· {t("mkt.src.addedOn", { date: f.dateTime(s.createdAt, { dateStyle: "medium" }) })}</span>
                   </div>
                 </div>
                 <button type="button" onClick={() => remove(s.id)} aria-label={`${t("mkt.src.remove")}: ${s.title}`}

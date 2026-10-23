@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { useFormat } from "@/lib/i18n/use-format";
 import type { MessageKey } from "@/lib/i18n/messages";
 
 interface LicenseStatus {
@@ -24,13 +25,14 @@ interface LicenseStatus {
 
 /** Licence key for self-hosted installs: enter a key, see what it unlocks, or ask for a free registered key. */
 export function LicenseCard() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
+  const f = useFormat();
   const [st, setSt] = useState<LicenseStatus | null>(null);
   const [key, setKey] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  const date = (v: string) => new Date(v).toLocaleDateString(lang === "id" ? "id-ID" : "en-US");
+  const date = (v: string) => f.date(v);
 
   const load = useCallback(() => api.get<LicenseStatus>("/license").then(setSt).catch(() => setSt(null)), []);
   useEffect(() => void load(), [load]);
