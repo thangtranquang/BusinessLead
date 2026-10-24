@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-24
+
+### Vietnam market support — 18:34 UTC
+**Summary:** Prospex can now find and message businesses in Vietnam as well as Indonesia, choosing the market per campaign.
+**Details:** New Market (Indonesia/Việt Nam) in the campaign form. Vietnamese phone numbers are recognised; landlines and service numbers get no WhatsApp messages. Google Maps searches use the Vietnamese setting; provinces for Vietnamese leads; timezone suggestion for new accounts. Market changes only while a campaign is a draft; a finished campaign can no longer be restarted (create a new one). Vietnamese Maps wording and province list are unverified against real runs (Simulated).
+
 ## 2026-10-23
 
 ### Vietnamese language support — 17:11 UTC

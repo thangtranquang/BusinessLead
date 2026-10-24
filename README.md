@@ -167,7 +167,7 @@ Lead scoring gives no phone points to a landline or service number (text "Landli
 - `market` other than `"ID"` or `"VN"`, and `null` or `""`, answer `400` ("market must be one of: ID, VN").
 - `PATCH /api/campaigns/:id` may change `market` only while the campaign is a draft, otherwise `409`. A campaign outside your workspace is `404`.
 - `POST /api/scraper/campaigns/:id/start` answers `409` unless the campaign is a draft or has failed. **A completed campaign can no longer be re-run: create a new one.**
-- Approving a WhatsApp draft for a landline or service number answers `400` "Not a mobile number" and the whole approval is refused (the batch stays as drafts). The sender checks again just before sending and marks the message failed with the same text; the provider is never called.
+- Creating drafts for many leads skips landline and service numbers (counted as "no valid phone"), so no draft is written for them. As a safety net, approving a WhatsApp draft for such a number still answers `400` "Not a mobile number" and the whole approval is refused (the batch stays as drafts). The sender checks again just before sending and marks the message failed with the same text; the provider is never called. A number typed with no lead is classified by the account's country code (`84` is Vietnamese, anything else Indonesian), at approve and at send.
 - **Compliance is risk information, not a claim.** For Vietnam the campaign form shows: "Vietnamese rules on unsolicited commercial messages (Decree 91/2020/ND-CP) and on personal data (Decree 13/2023/ND-CP) may apply to this outreach. This is risk information to review with a legal adviser, not legal advice." (Vietnamese: the same text under `camp.market.compliance`.) Prospex does not decide whether your outreach is lawful. The wording needs sign-off from the owner or a legal adviser.
 
 ### Upgrade notes (adding the market)
@@ -186,7 +186,10 @@ Lead scoring gives no phone points to a landline or service number (text "Landli
 - Indonesian Maps card parsing moved from the browser page into Node (`parseCard`). It is unit-tested (including an Indonesian card), but it was not re-verified against a real Indonesian run.
 - `normalizePhone(raw, '84')` stays generic; only `normalizePhoneFor(raw, market)` applies the Vietnamese rules. `regionFromNominatim` is unchanged; the new `regionFromAddress` dispatches by country.
 - The WhatsApp panel suggests the time zone only for an untouched account (no paired phone, time zone still `Asia/Jakarta`).
-- Bulk approval fails as a whole when one draft in it is a landline or service number.
+- Bulk approval still fails as a whole when one draft in it is a landline or service number (landline leads are no longer drafted, so this is a safety net).
+- Starting a campaign is check-then-act: a double click can enqueue two jobs (pre-existing, not fixed).
+- The Vietnamese phone numbers in tests and docs (for example `0901234567`, `028 3822 1234`) are invented placeholders that look real; a follow-up should replace them with visibly fake ones (`0900 000 00n`, `028 0000 000n`). The Indonesian regression snapshot files keep their values.
+- Indonesian area inputs over 400 characters are capped.
 - Vietnamese contact-page keywords for website enrichment were not added. There is no Zalo channel.
 - The same phone number in two markets is not separated: a referral for a number that already belongs to a lead in the workspace is not added again, and the first lead with that number wins.
 - The Outbox template panel lists only leads that come from Google Maps.
