@@ -25,6 +25,8 @@ export const templatesEn = {
   "tpl.created": "{n} drafts are ready in the Review tab.",
   "tpl.skipped": "Skipped: {noContact} without contact, {opted} opted out, {already} already messaged.",
   "tpl.writing": "Writing…",
+  "tpl.landline": "Landline: cannot receive WhatsApp",
+  "tpl.service": "Service number: not WhatsApp-capable",
   "tpl.aiRisk": "Check before you use it: {risks}",
   "wa.attach.title": "Attachment",
   "wa.attach.none": "No file",

@@ -51,6 +51,7 @@ export const leadsVi: Record<keyof typeof leadsEn, string> = {
   "leads.detail.back": "Quay lại danh sách khách hàng tiềm năng",
   "leads.detail.contact": "Thông tin liên hệ",
   "leads.detail.phone": "Điện thoại",
+  "leads.phone.landline": "Điện thoại bàn: không nhận được WhatsApp",
   "leads.detail.website": "Website",
   "leads.detail.address": "Địa chỉ",
   "leads.detail.rating": "Đánh giá",

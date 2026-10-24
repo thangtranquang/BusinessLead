@@ -115,6 +115,8 @@ export const vi: Record<keyof typeof en, string> = {
   "outbox.set.quietEnd": "Không gửi đến (giờ)",
   "outbox.set.tz": "Múi giờ",
   "outbox.set.cc": "Mã quốc gia mặc định",
+  "outbox.set.ccNotice": "Mã quốc gia WhatsApp của bạn là +62 nhưng bạn có chiến dịch Việt Nam: khách hàng tiềm năng ở Việt Nam tự động dùng +84; mã này chỉ áp dụng cho số bạn tự nhập.",
+  "outbox.manual.service": "Số tổng đài: không dùng được WhatsApp",
   "outbox.set.hint": "Càng thấp càng an toàn. 10 tin mỗi giờ là mức khởi đầu hợp lý cho một số chưa từng gửi tin hàng loạt.",
   "outbox.set.save": "Lưu",
   "outbox.set.saved": "Đã lưu giới hạn",

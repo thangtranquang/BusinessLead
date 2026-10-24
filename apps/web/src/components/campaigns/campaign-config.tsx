@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { useFormat } from "@/lib/i18n/use-format";
 import { effectiveOutputLanguage } from "@/lib/i18n/lang";
 import type { MessageKey } from "@/lib/i18n/messages";
+import { marketName } from "@/lib/market-ui";
 import type { Campaign } from "@/hooks/use-campaigns";
 
 const IND = ["restaurant", "cafe", "retail", "automotive", "healthcare", "beauty", "education", "realestate", "event", "tech", "professional"];
@@ -25,6 +26,7 @@ export function CampaignConfig({ campaign }: { campaign: Campaign & { maxResults
   const rows: [string, string][] = [
     [t("camp.cfg.industry"), label("camp.ind", IND, campaign.industry)],
     [t("camp.cfg.location"), campaign.location],
+    [t("camp.cfg.market"), marketName(campaign.market === "VN" ? "VN" : "ID")],
     [t("camp.cfg.maxResults"), campaign.maxResults ? t("camp.form.leadsCount", { n: campaign.maxResults }) : "—"],
     [t("camp.cfg.style"), label("camp.style", STYLES, campaign.contentStyle)],
     [t("camp.cfg.language"), label("camp.lang", LANGS, effectiveOutputLanguage(campaign.language))],

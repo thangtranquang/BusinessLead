@@ -27,6 +27,8 @@ export const templatesVi: Record<keyof typeof templatesEn, string> = {
   "tpl.created": "{n} bản nháp đã sẵn sàng ở thẻ Chờ duyệt.",
   "tpl.skipped": "Đã bỏ qua: {noContact} không có liên hệ, {opted} đã từ chối nhận tin, {already} đã nhắn tin.",
   "tpl.writing": "Đang soạn…",
+  "tpl.landline": "Điện thoại bàn: không nhận được WhatsApp",
+  "tpl.service": "Số tổng đài: không dùng được WhatsApp",
   "tpl.aiRisk": "Hãy kiểm tra trước khi dùng: {risks}",
   "wa.attach.title": "Tệp đính kèm",
   "wa.attach.none": "Không có tệp",

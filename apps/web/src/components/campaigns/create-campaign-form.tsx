@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { effectiveOutputLanguage } from "@/lib/i18n/lang";
+import { UI_MARKETS, defaultMarketForUi, exampleCity, locationPlaceholderKey, marketName, nationwideKeyword, type UiMarket } from "@/lib/market-ui";
 import { SourceMaterial } from "@/components/marketing/source-material";
 import { hasBrief, type Brief, type BriefResponse } from "@/components/marketing/types";
 import { toast } from "sonner";
@@ -17,7 +18,7 @@ import { Loader2, Plus, Sparkles, X } from "lucide-react";
 import { briefIsRunning, generateBrief, waitForBrief } from "@/lib/generate-brief";
 
 export function CreateCampaignForm() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [queries, setQueries] = useState<string[]>([""]);
@@ -31,6 +32,10 @@ export function CreateCampaignForm() {
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set());
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [noteOpen, setNoteOpen] = useState(false);
+  // the market starts from the UI language (never from earlier campaigns); once the person picks one it stays
+  const [market, setMarket] = useState<UiMarket>(() => defaultMarketForUi(lang));
+  const [marketTouched, setMarketTouched] = useState(false);
+  useEffect(() => { if (!marketTouched) setMarket(defaultMarketForUi(lang)); }, [lang, marketTouched]);
   const [form, setForm] = useState({
     name: "",
     industry: "",
@@ -124,6 +129,7 @@ export function CreateCampaignForm() {
         maxResults: Number(form.maxResults),
         contentStyle: form.contentStyle,
         language: form.language,
+        market,
       });
       await api.post(`/scraper/campaigns/${campaign.id}/start`, {});
       router.push(`/campaigns/${campaign.id}`);
@@ -202,9 +208,19 @@ export function CreateCampaignForm() {
                 </div>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="location">{t("camp.form.location")}{badge("location")}</Label>
-              <Input id="location" placeholder={t("camp.form.locationPh")} value={form.location} onChange={set("location")} required />
+              <div className="flex min-w-0 gap-2">
+                <Select value={market} onValueChange={(v) => { setMarketTouched(true); setMarket(v as UiMarket); }}>
+                  <SelectTrigger aria-label={t("camp.form.market")} data-testid="market-select" className="w-[8.5rem] flex-shrink-0"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {UI_MARKETS.map((m) => <SelectItem key={m} value={m}>{marketName(m)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input id="location" className="min-w-0" placeholder={t(locationPlaceholderKey(market))} value={form.location} onChange={set("location")} required />
+              </div>
+              <p className="text-xs text-muted-foreground" data-testid="location-help">{t("camp.form.locationHelp", { keyword: nationwideKeyword(market) })}</p>
+              {market === "VN" && <p className="rounded-md border bg-muted/40 p-2 text-xs leading-relaxed text-muted-foreground" data-testid="market-compliance">{t("camp.market.compliance")}</p>}
             </div>
           </div>
           <div className="space-y-2">
@@ -217,7 +233,7 @@ export function CreateCampaignForm() {
                 <div key={i} className="flex gap-2">
                   <Input
                     data-testid="query-input"
-                    placeholder={t("camp.form.queryPh", { industry: form.industry || "restaurant", location: form.location || "Jakarta" })}
+                    placeholder={t("camp.form.queryPh", { industry: form.industry || "restaurant", location: form.location || exampleCity(market) })}
                     value={q}
                     onChange={(e) => updateQuery(i, e.target.value)}
                     required

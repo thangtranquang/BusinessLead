@@ -49,6 +49,7 @@ export const leadsEn = {
   "leads.detail.back": "Back to leads",
   "leads.detail.contact": "Contact Info",
   "leads.detail.phone": "Phone",
+  "leads.phone.landline": "Landline: cannot receive WhatsApp",
   "leads.detail.website": "Website",
   "leads.detail.address": "Address",
   "leads.detail.rating": "Rating",

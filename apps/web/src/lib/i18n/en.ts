@@ -113,6 +113,8 @@ export const en = {
   "outbox.set.quietEnd": "Quiet until (hour)",
   "outbox.set.tz": "Timezone",
   "outbox.set.cc": "Default country code",
+  "outbox.set.ccNotice": "Your WhatsApp country code is +62 but you have a Vietnam campaign: Vietnamese leads use +84 automatically; the code applies only to numbers you type yourself.",
+  "outbox.manual.service": "Service number: not WhatsApp-capable",
   "outbox.set.hint": "Lower is safer. 10 per hour is a sensible start for a number that has not sent bulk messages before.",
   "outbox.set.save": "Save",
   "outbox.set.saved": "Limits saved",
