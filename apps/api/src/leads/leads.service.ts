@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
-import { normalizePhone } from "../messaging/phone";
+import { normalizePhone, normalizePhoneFor } from "../messaging/phone";
+import { normalizeMarket, phoneKind, type Market, type PhoneKind } from "../common/market";
 import { PrismaService } from "../prisma/prisma.service";
 import { toOutputLanguage, type OutputLanguage } from "../common/language";
 import { UpdateCrmDto } from "./dto/update-crm.dto";
@@ -16,6 +17,11 @@ export const REFERRAL_NOTE: Readonly<Record<OutputLanguage, (from: string) => st
   vietnamese: (from) => `Từ ${from}`,
   english: (from) => `From ${from}`,
 });
+
+/** The kind of line a stored lead number is under the lead's campaign market ("unknown" for Indonesia and for no number). */
+export function leadPhoneKind(phoneE164: string | null | undefined, market: unknown): PhoneKind {
+  return phoneE164 ? phoneKind(phoneE164, normalizeMarket(market)) : "unknown";
+}
 
 export interface LeadFilter {
   campaignId?: string;
@@ -112,13 +118,13 @@ export class LeadsService {
         take: limit,
         include: {
           activities: { orderBy: { createdAt: "desc" }, take: 5 },
-          campaign: { select: { id: true, name: true } },
+          campaign: { select: { id: true, name: true, market: true } },
         },
       }),
       this.prisma.lead.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    return { data: data.map((l) => ({ ...l, phoneKind: leadPhoneKind(l.phoneE164, l.campaign?.market) })), total, page, limit };
   }
 
   /**
@@ -126,11 +132,13 @@ export class LeadsService {
    * The same number is never added twice in one workspace.
    */
   async createFromReferral(workspaceId: string, fromLeadId: string, input: { name?: string; phone: string }) {
-    const from = await this.prisma.lead.findFirst({ where: { id: fromLeadId, workspaceId }, select: { id: true, name: true, category: true, campaignId: true, campaign: { select: { language: true } } } });
+    const from = await this.prisma.lead.findFirst({ where: { id: fromLeadId, workspaceId }, select: { id: true, name: true, category: true, campaignId: true, campaign: { select: { language: true, market: true } } } });
     if (!from) throw new NotFoundException(`Lead ${fromLeadId} not found`);
     const language = toOutputLanguage(from.campaign?.language);
-    const account = await this.prisma.whatsappAccount.findUnique({ where: { workspaceId }, select: { defaultCountryCode: true } });
-    const phoneE164 = normalizePhone(input.phone, account?.defaultCountryCode ?? "62");
+    const market = normalizeMarket(from.campaign?.market);
+    // Indonesia keeps today's rule (the account's default country code); Vietnam uses the Vietnamese rules
+    const account = market === "VN" ? null : await this.prisma.whatsappAccount.findUnique({ where: { workspaceId }, select: { defaultCountryCode: true } });
+    const phoneE164 = market === "VN" ? normalizePhoneFor(input.phone, market) : normalizePhone(input.phone, account?.defaultCountryCode ?? "62");
     if (!phoneE164) throw new BadRequestException("That phone number is not valid");
     const existing = await this.prisma.lead.findFirst({ where: { workspaceId, phoneE164 }, select: { id: true } });
     if (existing) return { created: false, leadId: existing.id };
@@ -150,12 +158,12 @@ export class LeadsService {
       where: { id, workspaceId },
       include: {
         activities: { orderBy: { createdAt: "desc" } },
-        campaign: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true, market: true } },
         followUps: { where: { done: false }, orderBy: { scheduledAt: "asc" } },
       },
     });
     if (!lead) throw new NotFoundException(`Lead ${id} not found`);
-    return lead;
+    return { ...lead, phoneKind: leadPhoneKind(lead.phoneE164, lead.campaign?.market) };
   }
 
   async updateCrm(id: string, dto: UpdateCrmDto, workspaceId = DEFAULT_WORKSPACE_ID) {
@@ -204,9 +212,9 @@ export class LeadsService {
     aiAnalysis?: object;
     campaignId: string;
     workspaceId: string;
-  }>) {
+  }>, market: Market = "ID") {
     return this.prisma.lead.createMany({
-      data: leads.map((l) => ({ ...l, phoneE164: normalizePhone(l.phone) })),
+      data: leads.map((l) => ({ ...l, phoneE164: normalizePhoneFor(l.phone, market) })),
       skipDuplicates: true,
     });
   }

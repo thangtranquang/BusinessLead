@@ -19,7 +19,7 @@ import { toApiLanguage } from "@/lib/i18n/lang";
  */
 
 interface Category { category: string; count: number; withPhone: number; withEmail: number }
-interface LeadRow { id: string; name: string; category: string | null; contact: string | null; reachable: boolean; alreadyMessaged: boolean }
+interface LeadRow { id: string; name: string; category: string | null; contact: string | null; reachable: boolean; reason?: "landline" | "service"; alreadyMessaged: boolean }
 type Channel = "whatsapp" | "email";
 
 export function TemplatePanel({ channel, onCreated }: { channel: Channel; onCreated: () => void }) {
@@ -131,7 +131,7 @@ export function TemplatePanel({ channel, onCreated }: { channel: Channel; onCrea
                         <label className={cn("flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted/50", off && "cursor-not-allowed opacity-50")}>
                           <input type="checkbox" disabled={off} checked={picked.has(l.id)} onChange={() => toggle(l.id)} className="h-4 w-4 accent-[hsl(var(--primary))]" />
                           <span className="min-w-0 flex-1 truncate">{l.name}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">{l.alreadyMessaged ? t("tpl.alreadyMessaged") : !l.reachable ? t("tpl.noContact") : l.category}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">{l.alreadyMessaged ? t("tpl.alreadyMessaged") : !l.reachable ? t(l.reason === "landline" ? "tpl.landline" : l.reason === "service" ? "tpl.service" : "tpl.noContact") : l.category}</span>
                         </label>
                       </li>
                     );

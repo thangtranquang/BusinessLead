@@ -7,7 +7,8 @@ import { capThenNfc, nfc, sliceChars } from "../common/text";
 import { planReplyAction } from "./reply-plan";
 import { classifyReply, intentMessages, looksAutomaticByTiming, parseIntent, planReplyOutcome, type ReplyIntent } from "./reply-intent";
 import { AiClientService } from "../ai/ai-client.service";
-import { normalizePhone } from "./phone";
+import { normalizePhoneFor } from "./phone";
+import { normalizeMarket } from "../common/market";
 import { loadConversation } from "./conversation-loader";
 import { parseReferrals } from "./wa-text";
 import { WHATSAPP_PROVIDER, type InboundWhatsappMessage, type OwnWhatsappMessage, type WhatsappProvider } from "./whatsapp.provider";
@@ -53,11 +54,11 @@ export class InboundService implements OnModuleInit {
   /** Leads scraped before phoneE164 existed get it once, so replies can be matched to them. */
   private async backfillLeadPhones() {
     for (let i = 0; i < 20; i++) {
-      const rows = await this.prisma.lead.findMany({ where: { phoneE164: null, phone: { not: null } }, select: { id: true, phone: true }, take: 500 });
+      const rows = await this.prisma.lead.findMany({ where: { phoneE164: null, phone: { not: null } }, select: { id: true, phone: true, campaign: { select: { market: true } } }, take: 500 });
       if (!rows.length) return;
       for (const r of rows) {
         // an unparseable number gets "" so it is not picked up again
-        await this.prisma.lead.update({ where: { id: r.id }, data: { phoneE164: normalizePhone(r.phone) ?? "" } });
+        await this.prisma.lead.update({ where: { id: r.id }, data: { phoneE164: normalizePhoneFor(r.phone, normalizeMarket(r.campaign?.market)) ?? "" } });
       }
     }
   }
@@ -65,7 +66,7 @@ export class InboundService implements OnModuleInit {
   async handle(workspaceId: string, original: InboundWhatsappMessage) {
     // one normal form from the start: what is stored, matched and shown is NFC (FR-44.1)
     const msg = { ...original, text: capThenNfc(original.text, 4000) };
-    const lead = await this.prisma.lead.findFirst({ where: { workspaceId, phoneE164: msg.phone }, orderBy: { createdAt: "desc" }, include: { campaign: { select: { yourService: true, language: true } } } });
+    const lead = await this.prisma.lead.findFirst({ where: { workspaceId, phoneE164: msg.phone }, orderBy: { createdAt: "desc" }, include: { campaign: { select: { yourService: true, language: true, market: true } } } });
     try {
       await this.prisma.inboundMessage.create({ data: { workspaceId, leadId: lead?.id, fromPhone: msg.phone, body: msg.text.slice(0, 4000), providerMessageId: msg.id, receivedAt: msg.at } });
     } catch (e) {
@@ -117,7 +118,7 @@ export class InboundService implements OnModuleInit {
     });
     await this.prisma.leadActivity.create({ data: { leadId: lead.id, type: "replied", note: msg.text.slice(0, 140), metadata: { intent: outcome.intent, stage: outcome.stage } } });
     if (outcome.intent === "referral") {
-      const contacts = parseReferrals(conv.incoming);
+      const contacts = parseReferrals(conv.incoming, normalizeMarket(lead.campaign?.market));
       await this.prisma.leadActivity.create({ data: { leadId: lead.id, type: "referral", note: contacts.length ? contacts.map((c) => `${c.name ?? ""} ${c.phone}`.trim()).join(", ") : msg.text.slice(0, 140), metadata: { contacts: contacts.map((c) => ({ name: c.name, phone: c.phone })) } } });
     }
     // they answered: pending follow-ups no longer make sense

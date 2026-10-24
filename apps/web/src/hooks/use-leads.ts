@@ -9,6 +9,8 @@ export interface Lead {
   lat?: number | null;
   lng?: number | null;
   phone: string;
+  /** Computed by the API from the stored number and the campaign market. */
+  phoneKind?: "mobile" | "landline" | "service" | "unknown";
   website: string;
   rating: string;
   reviewCount?: number | null;

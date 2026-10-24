@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { normalizeRating } from "../scraper/maps-parse";
+import { classifyRawPhone, type Market } from "../common/market";
 
 interface LeadData {
   name: string;
@@ -48,11 +49,14 @@ export interface LeadIntelligence {
  */
 @Injectable()
 export class LeadIntelligenceService {
-  scoreLead(lead: LeadData, fit?: FitVerdict): LeadIntelligence {
+  scoreLead(lead: LeadData, fit?: FitVerdict, market: Market = "ID"): LeadIntelligence {
     let score = 30;
     const factors: string[] = [];
 
-    if (lead.phone) { score += 15; factors.push("Has a phone number"); } else factors.push("No phone number: cannot be reached on WhatsApp");
+    // Indonesia has no line kinds, so every non-empty phone still scores +15 there. A Vietnamese landline or service number cannot get WhatsApp.
+    const kind = lead.phone ? classifyRawPhone(lead.phone, market) : "unknown";
+    if (lead.phone && (kind === "landline" || kind === "service")) factors.push(kind === "landline" ? "Landline: cannot be reached on WhatsApp" : "Service number: cannot be reached on WhatsApp");
+    else if (lead.phone) { score += 15; factors.push("Has a phone number"); } else factors.push("No phone number: cannot be reached on WhatsApp");
     if (lead.address) score += 3;
 
     const rawRating = parseFloat(normalizeRating(lead.rating) || "0");
@@ -92,9 +96,9 @@ export class LeadIntelligenceService {
   }
 
   /** Scores and sorts. `fits[i]` is the fit verdict for `leads[i]` (or undefined when it was not assessed). */
-  scoreLeads(leads: LeadData[], fits: (FitVerdict | undefined)[] = []): Array<LeadData & LeadIntelligence> {
+  scoreLeads(leads: LeadData[], fits: (FitVerdict | undefined)[] = [], market: Market = "ID"): Array<LeadData & LeadIntelligence> {
     return leads
-      .map((lead, i) => ({ ...lead, ...this.scoreLead(lead, fits[i]) }))
+      .map((lead, i) => ({ ...lead, ...this.scoreLead(lead, fits[i], market) }))
       .sort((a, b) => b.score - a.score);
   }
 }

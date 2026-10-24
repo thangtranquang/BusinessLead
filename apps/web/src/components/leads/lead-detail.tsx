@@ -156,6 +156,7 @@ export function LeadDetail({ id }: { id: string }) {
               <CardTitle className="text-base">{t("leads.detail.contact")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {lead.phoneKind === "landline" && <p className="text-xs text-warning">{t("leads.phone.landline")}</p>}
               {[
                 { icon: Phone, label: t("leads.detail.phone"), value: lead.phone },
                 { icon: Mail, label: t("leads.enrich.email"), value: lead.email ?? undefined },

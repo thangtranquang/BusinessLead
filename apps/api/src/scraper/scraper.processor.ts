@@ -87,7 +87,7 @@ export class ScraperProcessor extends WorkerHost {
 
       // Fit is judged per business from its name and real Google Maps category, against the offer and the Marketing Brief (needs an AI provider).
       const fits = await this.fit.assess(workspaceId, rawLeads.map((l) => ({ name: l.name, category: l.category })), data.yourService, language);
-      const scoredLeads = this.leadIntelligence.scoreLeads(rawLeads, fits);
+      const scoredLeads = this.leadIntelligence.scoreLeads(rawLeads, fits, market);
       await this.campaigns.updateStatus(campaignId, "running", 60);
 
       const processedLeads = await Promise.all(
@@ -137,7 +137,7 @@ export class ScraperProcessor extends WorkerHost {
         }),
       );
 
-      await this.leads.createMany(processedLeads);
+      await this.leads.createMany(processedLeads, market);
 
       const highQuality = processedLeads.filter((l) => (l.score ?? 0) >= 70).length;
       const priority = processedLeads.filter((l) => l.priority === "HIGH").length;

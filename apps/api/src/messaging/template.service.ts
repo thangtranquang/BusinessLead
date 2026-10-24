@@ -9,10 +9,19 @@ import { MessageWriterService } from "./message-writer.service";
 import { MAX_BODY, MAX_EMAIL_BODY } from "./messaging.service";
 import { OPT_OUT_HINT } from "./opt-out";
 import { outputLanguageOrDefault, type OutputLanguage } from "../common/language";
-import { normalizePhone } from "./phone";
+import { normalizePhone, normalizePhoneFor } from "./phone";
+import { normalizeMarket, phoneKind, type Market } from "../common/market";
 import type { OutreachVariant } from "../ai/chat-import/style-prompt";
 
 export const MAX_TEMPLATE_LEADS = 500;
+
+export type UnreachableReason = "landline" | "service";
+
+/** Why a WhatsApp number cannot be messaged (Vietnamese landline or 1800/1900 service number), or null. Never changes email. */
+export function whatsappBlock(e164: string, market: Market): UnreachableReason | null {
+  const kind = phoneKind(e164, market);
+  return kind === "landline" || kind === "service" ? kind : null;
+}
 export type Channel = "whatsapp" | "email";
 
 /** `{nama}` and `{kategori}` become the lead's own name and category; nothing else is substituted. */
@@ -50,14 +59,20 @@ export class TemplateService {
       },
       orderBy: [{ score: "desc" }, { createdAt: "asc" }],
       take,
-      select: { id: true, name: true, category: true, phone: true, phoneE164: true, email: true, score: true, crmStatus: true, outbound: { where: { channel: f.channel, source: "ai_outreach", status: { in: ["draft", "approved", "sending", "sent"] } }, select: { status: true }, take: 1 } },
+      select: { id: true, name: true, category: true, phone: true, phoneE164: true, email: true, score: true, crmStatus: true, campaign: { select: { market: true } }, outbound: { where: { channel: f.channel, source: "ai_outreach", status: { in: ["draft", "approved", "sending", "sent"] } }, select: { status: true }, take: 1 } },
     });
-    return rows.map((l) => ({
-      id: l.id, name: l.name, category: l.category, score: l.score, crmStatus: l.crmStatus,
-      contact: f.channel === "email" ? l.email : l.phoneE164 || l.phone,
-      reachable: f.channel === "email" ? !!l.email && isValidEmail(l.email.trim().toLowerCase()) : !!(l.phoneE164 || normalizePhone(l.phone)),
-      alreadyMessaged: l.outbound.length > 0,
-    }));
+    return rows.map((l) => {
+      const market = normalizeMarket(l.campaign?.market);
+      const e164 = f.channel === "email" ? "" : l.phoneE164 || normalizePhoneFor(l.phone, market) || "";
+      const reason = f.channel === "email" || !e164 ? null : whatsappBlock(e164, market);
+      return {
+        id: l.id, name: l.name, category: l.category, score: l.score, crmStatus: l.crmStatus,
+        contact: f.channel === "email" ? l.email : l.phoneE164 || l.phone,
+        reachable: f.channel === "email" ? !!l.email && isValidEmail(l.email.trim().toLowerCase()) : !!e164 && !reason,
+        ...(reason ? { reason } : {}),
+        alreadyMessaged: l.outbound.length > 0,
+      };
+    });
   }
 
   /** The AI writes ONE generic message for a kind of business. Consumes one draft from the plan. */
@@ -87,7 +102,7 @@ export class TemplateService {
     const found = o.channel === "whatsapp" ? await maybePreview(body, o.linkPreview, !!o.attachmentId && body.length <= CAPTION_LIMIT) : null;
     const card = found ? (found as unknown as Prisma.InputJsonValue) : undefined;
     const ids = [...new Set(o.leadIds)].slice(0, MAX_TEMPLATE_LEADS);
-    const leads = await this.prisma.lead.findMany({ where: { workspaceId, id: { in: ids } }, select: { id: true, name: true, category: true, phone: true, phoneE164: true, email: true } });
+    const leads = await this.prisma.lead.findMany({ where: { workspaceId, id: { in: ids } }, select: { id: true, name: true, category: true, phone: true, phoneE164: true, email: true, campaign: { select: { market: true } } } });
     const account = await this.prisma.whatsappAccount.findUnique({ where: { workspaceId }, select: { defaultCountryCode: true } });
     const optPhones = new Set((await this.prisma.messageOptOut.findMany({ where: { workspaceId }, select: { phone: true } })).map((r) => r.phone));
     const optEmails = new Set((await this.prisma.emailOptOut.findMany({ where: { workspaceId }, select: { email: true } })).map((r) => r.email));
@@ -98,7 +113,9 @@ export class TemplateService {
     const skipped = { noContact: 0, optedOut: 0, alreadyMessaged: 0 };
     const rows: { lead: (typeof leads)[number]; to: string }[] = [];
     for (const l of leads) {
-      const to = o.channel === "email" ? (l.email ?? "").trim().toLowerCase() : l.phoneE164 || normalizePhone(l.phone, account?.defaultCountryCode ?? "62") || "";
+      const market = normalizeMarket(l.campaign?.market);
+      const to = o.channel === "email" ? (l.email ?? "").trim().toLowerCase() : l.phoneE164 || (market === "VN" ? normalizePhoneFor(l.phone, market) : normalizePhone(l.phone, account?.defaultCountryCode ?? "62")) || "";
+      if (o.channel === "whatsapp" && to && whatsappBlock(to, market)) { skipped.noContact++; continue; }
       if (!to || (o.channel === "email" && !isValidEmail(to))) { skipped.noContact++; continue; }
       if ((o.channel === "email" ? optEmails : optPhones).has(to)) { skipped.optedOut++; continue; }
       if (taken.has(to) || messagedLeads.has(l.id)) { skipped.alreadyMessaged++; continue; }
