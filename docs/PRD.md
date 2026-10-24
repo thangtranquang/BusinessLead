@@ -22,7 +22,7 @@ Prospex is a self-hosted, open-source outreach platform for selling to local bus
 ## Table of contents
 
 1. [Vietnamese language support (replaces Indonesian)](#1-vietnamese-language-support-replaces-indonesian) (as-implemented deviations and known limitations: 1.14)
-2. [Vietnam market support (next to Indonesia)](#2-vietnam-market-support-next-to-indonesia) (follow-up to 1/OQ-9; requirement ids are prefixed `VM-`)
+2. [Vietnam market support (next to Indonesia)](#2-vietnam-market-support-next-to-indonesia) (follow-up to 1/OQ-9, as implemented; deviations and known limitations: 2.14; requirement ids are prefixed `VM-`)
 
 ---
 
@@ -297,7 +297,7 @@ Open questions and decisions needed (all of them are resolved in 1.8.1; the text
 - **OQ-6 Number and currency formatting.** `billing-page.tsx` prints plan prices as `Rp<number>` and `pipeline-page.tsx` formats deal values with the `id-ID` grouping. Grouping becomes locale-driven (FR-11). The currency symbol belongs to the hosted plans (private plugin) and to the user's own deal values; decision needed on whether deal values need a currency setting (for example VND). Not decided here.
 - **OQ-7 Language of a manual email draft.** `email.service.ts` stores a hard-coded language for manual drafts and `email.controller.ts` takes no language. Recommendation: default to `"vietnamese"` (FR-18). Alternative: add an optional validated `language` field to the manual-draft request, or derive it from the lead's campaign when a lead is attached.
 - **OQ-8 Replacement text for "Meminta berhenti (STOP)".** *Resolved in 1.8.1 and G-24: Vietnamese "Dừng nhận tin (STOP)", FR-33; the recommendation below is superseded.* Original recommendation: store a language-neutral English reason (`Asked to stop (STOP)`) because the value is data shown in the pipeline's "why deals were lost" list for every user; alternative: Vietnamese text (`Yêu cầu dừng nhận tin (STOP)`). Needs a decision because it is user-visible data, not a UI string.
-- **OQ-9 Phone numbers, region lookup and Maps language for Vietnamese leads.** Out of scope here but a functional gap for a Vietnamese user: with the current defaults a local-format Vietnamese number (`0...`) normalised without a configured country code becomes `62...` (leads created through `leads.service.ts:197` call `normalizePhone` without the account's country code), region lookup yields no province, city or district for leads outside Indonesia, and the scraper searches `<area>, Indonesia`. The WhatsApp panel already lets the owner set `defaultCountryCode` (to `84`), but not every code path passes it. Recommendation: raise a separate feature ("Vietnam market support") rather than widening this one; until then `docs/features.md` and the user guide must not claim Vietnamese-market lead discovery.
+- **OQ-9 Phone numbers, region lookup and Maps language for Vietnamese leads.** **Implemented as the follow-up in section 2 (Vietnam market support; see 2.14 for deviations and limitations).** The text below is the original question, kept for history. Out of scope here but a functional gap for a Vietnamese user: with the current defaults a local-format Vietnamese number (`0...`) normalised without a configured country code becomes `62...` (leads created through `leads.service.ts:197` call `normalizePhone` without the account's country code), region lookup yields no province, city or district for leads outside Indonesia, and the scraper searches `<area>, Indonesia`. The WhatsApp panel already lets the owner set `defaultCountryCode` (to `84`), but not every code path passes it. Recommendation: raise a separate feature ("Vietnam market support") rather than widening this one; until then `docs/features.md` and the user guide must not claim Vietnamese-market lead discovery.
 - **OQ-10 Tone presets.** FR-22.3 fixes the default register (polite, `anh/chị`, `em`/`chúng tôi`). Whether the owner can choose a preset (for example `bạn` for younger audiences) is not part of this feature; it is inferred from the owner's imported chats through AI Style only.
 - **OQ-11 Native-speaker review.** Dictionaries (about 950 strings), canned replies, the opt-out line, the footer and the unsubscribe copy need a named native-speaker reviewer before release. Not determinable from the code.
 
@@ -572,7 +572,7 @@ Source: the slice results S1 to S9 of the implementation plan, spot-checked agai
 | Playwright specs | Shipped as `tests/e2e/language.spec.ts`, `zz-language-api.spec.ts` (named `zz-` so it runs last because of the global throttle of 60 requests per 60 s), `helpers-language.ts`, plus `i18n-dictionaries.spec.ts` and a language-helpers spec | Last full run: 155 pass, 2 skipped, 0 fail. The two skipped tests (valid-language brief generate and template generate) need a real AI key. `scripts/pipeline-check.ts`: 80 PASS. API unit tests: 732 (after the review fix; the e2e figures were taken before it) |
 | Simulated status (FR-36, AC-19) | **Simulated** | The Vietnamese export strings and `SA` / `CH` meridiem tokens are invented and best-effort; marked Simulated in `docs/features.md` until a real Android and iOS export is tested |
 | Native-speaker review (OQ-11) | **Pending, release gate** | Groups of items to review: UI dictionaries (857 keys, 16-item list from S2), canned replies and fallbacks (`reply-plan.ts`), opt-out line, email footer and unsubscribe pages, `OUTPUT_RULES` / `OUTPUT_NOTE` wording and exemplars, closings and `Xem thêm`, subject promotional-word list, `DEFAULT_BUSINESS_TEXT.vietnamese` and `replyBusinessDescription`, brief gap and grounding wording (`noLocation`, `noCustomerType`, `passFailed`, `notInSources`, price, `summaryNumbers`), the invented parser strings |
-| Vietnam market gaps (OQ-9) | **Out of scope** | Phone country code 62 default, region lookup, Maps locale and `, Indonesia` search suffix are unchanged; `docs/features.md` and the user guide must not claim Vietnamese-market lead discovery |
+| Vietnam market gaps (OQ-9) | **Closed by section 2** (was out of scope of section 1) | Market-aware phone codes, region lookup, Maps locale and area suffix are implemented in section 2 (per-campaign `market`). Section 1 itself did not change them. Vietnamese Maps parsing is Simulated (never run against real Maps); see 2.14 for the limits |
 | `alreadyIntroduced` and reply `"auto"` normaliser | Heuristic, unchanged | `alreadyIntroduced` is a heuristic; the reply path still normalises with `"auto"` (S8 notes) |
 | Root `CLAUDE.md` Frontend line | Needs user approval | Still names `id.ts` until the user approves the one-line edit (1.12, 1.13) |
 
@@ -580,7 +580,7 @@ Source: the slice results S1 to S9 of the implementation plan, spot-checked agai
 
 ## 2. Vietnam market support (next to Indonesia)
 
-Status: **Requirements v2, architecture review amendments applied (CONDITIONAL PASS, 2026-10-24)**, not implemented. Where an earlier line and 2.13 disagree, 2.13 wins; contradictions C-1 to C-6 and gaps G-1 to G-10 from the use-case review are resolved in place and listed in 2.13. Branch `feat/vietnam-market-support`, created from `feat/vietnamese-language` (committed, not merged), so section 1 is the baseline. This section is the "Vietnam market support" feature recommended by 1/OQ-9 and 1.14. Requirement ids carry the prefix `VM-` (`VM-FR-n`, `VM-NFR-n`, `VM-AC-n`, `VM-OQ-n`) and are cited from outside as `2/VM-FR-n`. Section 1 changed the **language** of the product; this section changes the **market** it can sell into.
+Status: **As implemented** (requirements v2 with the architecture review amendments of 2.13, CONDITIONAL PASS 2026-10-24, then built in slices S1 to S9 on this branch). Where the shipped behaviour differs from the requirement text below, **2.14 wins** and lists each difference and its reason; the requirement text is kept as written for traceability. Where an earlier line and 2.13 disagree, 2.13 wins; contradictions C-1 to C-6 and gaps G-1 to G-10 from the use-case review are resolved in place and listed in 2.13. Branch `feat/vietnam-market-support`, created from `feat/vietnamese-language` (committed, not merged), so section 1 is the baseline. This section is the "Vietnam market support" feature recommended by 1/OQ-9 and 1.14. Requirement ids carry the prefix `VM-` (`VM-FR-n`, `VM-NFR-n`, `VM-AC-n`, `VM-OQ-n`) and are cited from outside as `2/VM-FR-n`. Section 1 changed the **language** of the product; this section changes the **market** it can sell into.
 
 ### 2.1 Feature description
 
@@ -751,7 +751,7 @@ Questions for the **user** (not product decisions of this PRD, flagged for the o
 
 **Out of scope:** the official WhatsApp Cloud API (hosted-only, separate private package); a **Zalo** channel (a likely future channel for Vietnam, not part of this feature; the design does not block it: the market profile and `phoneKind` are channel-neutral); markets other than `ID` and `VN`; currency and price formatting (`Rp`, VND; 1/OQ-6 stays open); a database-backed profile table or an admin screen to edit profiles; a pre-send WhatsApp-capability network check; verification by a **real** Google Maps run (see below); ward-level datasets; English or Indonesian translation changes; Vietnamese contact-page keywords (`liên hệ`, `giới thiệu`) in website enrichment (follow-up; `contact-extract.ts` only takes `+international` numbers and is already market-neutral); cloning or re-running a campaign into another market (create a new campaign); the same number in an `ID` and a `VN` campaign (dedupe stays per workspace on `phoneE164`, the first lead wins; documented).
 
-**Not verifiable from the code or in this drafting step:**
+**Not verifiable from the code or in this drafting step** (status after implementation: the province source and the numbering plan were later checked, see 2.14; the real Maps run was not done):
 
 - The **2025 province merger facts** in VM-FR-14 (resolution number, effective date, the 34 units, the merged names): recalled, not looked up. They must be checked against the official source before the dataset ships.
 - The **exact Vietnamese Maps texts** (end-of-list message, search-box label, `aria-label` wording for stars and reviews, opening-hours phrases, detail-pane labels `Địa chỉ`, `Điện thoại`, `Trang web`): the strings in VM-FR-8 are best-effort, and **Vietnamese Maps parsing is Simulated** (invented fixtures only). A **real-run verification** would need: a machine with Playwright Chromium, a network that Google does not block, a handful of low-volume searches in `hl=vi` for Ho Chi Minh City, Hanoi and Da Nang, a saved snapshot of the card HTML (with the business data removed before it is committed), and a comparison of what the parser extracted versus what the page showed. It must respect Google's terms and the pacing in `scraper.processor.ts`.
@@ -787,7 +787,7 @@ Docs follow the code (`CLAUDE.md` Conventions); every claim is checked against t
 - `docs/architecture.md`: a short "Markets" section (profile registry location, the rule that unknown values read as `ID`, where the market is read: scraper, phone normaliser, geo, sending account defaults).
 - `docs/USER_GUIDE.md` (Vietnamese): the Location rows (lines ~176, ~179), the market limitation block (~185, to be rewritten, not just removed), the timezone row (~390), and a "Thị trường" row for the form; explain the comma rule (VM-OQ-4) and that landline numbers are not WhatsApp-reachable.
 - `docs/whatsapp-outbox.md`: the phone rules and the landline reason, if the file describes numbers.
-- This PRD: update 1.8 (OQ-9) and 1.14 ("Vietnam market gaps") with a pointer to section 2 when the feature ships.
+- This PRD: update 1.8 (OQ-9) and 1.14 ("Vietnam market gaps") with a pointer to section 2 when the feature ships (done).
 - `CHANGELOG.md` at merge-ready, plain language, one entry (Added: Vietnam market; no Indonesian change).
 - Repository-root `CLAUDE.md`: if the architect adds an invariant (for example "scraper, phone and region code take the campaign's market from the profile registry, never a literal country"), a one-line edit needs the user's approval and is not made by the slices on their own.
 - Also document the compliance wording (VM-FR-26) in README and `docs/USER_GUIDE.md`, the 409 and landline behaviour in `docs/whatsapp-outbox.md`, and the "first lead wins across markets" note in `docs/features.md`.
@@ -826,3 +826,49 @@ Verdict: **CONDITIONAL PASS** (architect, 2026-10-24). Conditions: S1 snapshots 
 | A26 | G-10: ID placeholder follows UI-language text with Indonesian example places; VN placeholder uses Vietnamese places in both languages | VM-FR-19 |
 | A27 | i18n: the `id.ts` dictionaries no longer exist; check which dictionaries exist before adding keys | VM-FR-20 |
 | A28 | Slices S1 to S9 in waves W1 to W6 and the security pre-review list | 2.11 |
+
+### 2.14 As-implemented deviations and known limitations
+
+Source: the DONE sections of the implementation plan (slices S1 to S9), spot-checked against `apps/api/src` and `apps/web/src` (for example `regionFromAddress` in `leads/geo.ts`, `parseCard` and `toLeadPhone` in `scraper/maps-parse.ts`, `resolveJobMarket` in `scraper/scraper.processor.ts`, the 409 in `scraper/scraper.controller.ts`, `marketName` in `apps/web/src/lib/market-ui.ts`). Where 2.4 to 2.13 and this section disagree, this section describes what shipped.
+
+#### Deviations from the requirement text
+
+| Item | PRD said | Shipped | Reason |
+|------|----------|---------|--------|
+| Province dataset location (VM-FR-14, VM-FR-2) | 34-province list for the area planner, dataset in `leads/geo.ts` | The dataset lives in `leads/vn-provinces.ts` (geo only). The area planner uses `MARKET.VN.cities` plus an alias table in `scraper/areas.ts` | Keeps the planner free of a geo import; search terms (cities people type) differ from province-level units |
+| `regionFromNominatim` (VM-FR-4, VM-FR-13) | Dispatch inside the existing function | `regionFromNominatim` is unchanged; a new `regionFromAddress` dispatches by `country_code` (used by `geo.service.ts`). The S1 snapshot stays pinned: `vn` returns `null` from `regionFromNominatim` | The S1 snapshot must never be edited, so the ID function stays byte-identical |
+| `normalizePhone(raw, '84')` (VM-FR-4, VM-FR-9) | VN rules reachable through the existing function | `normalizePhone(raw, '84')` does **not** delegate; only `normalizePhoneFor(raw, market)` applies the VN rules | The `normalizePhone` signature and results are pinned by the ID snapshot |
+| Referral parsing (VM-FR-12, A8) | Bounded VN alternative in the `wa-text` referral regex | `parseReferrals` has the VN alternative only with market `VN`, and matches compact numbers only. A spaced `+84 90 123 4567` in free text is not matched | Keeps the regex linear and ID behaviour unchanged; spaced numbers in free text are ambiguous |
+| Phone field length (VM-FR-12, A24) | DTO `MaxLength(64)` for phone input | `ManualDto` and `ReferralDto` use `@MaxLength(64)`, loosened from 32 and 40 | One bound for every phone input; the old values were tighter than the 64-character cap |
+| QA example (QA test cases) | `+62 812 0000 0001` | Corrected: the example had the wrong digit count, so the test uses a corrected invented number | Digit-count error in the QA text |
+| Numbering plan (VM-FR-10, 2.10) | Rules from the owner's recollection, "not verifiable" | Verified online: mobile is `0` plus 9 digits, landline `02x` with 10 digits. The shipped bound stays the looser 8..15 digits, with kind `unknown` for numbers that fit neither plan | A strict bound would reject numbers that may be valid (portability, variants); `unknown` is selectable and not penalised (A23) |
+| Card parsing (VM-FR-8, C-6) | Raw digits read from the page for the phone only | Card parsing moved from the page into Node (`parseCard`) for **both** markets; the page returns raw text only. The ID logic was ported logic-for-logic and is unit-tested, but not re-verified in a real run | One parser in testable Node code; `page.evaluate` receives no market value |
+| `toLeadPhone` (VM-FR-12) | Converts the stored form | The ID path also collapses leading zeros | Matches the dedupe key behaviour for `00`-prefixed input |
+| Area input length (VM-NFR-3) | Not stated for areas | ID inputs over 400 characters are capped in the areas functions | Bounded work on hostile input |
+| Job market (VM-FR-6, A6) | DB value at job start, payload as fallback | `resolveJobMarket(dbValue, jobValue)`: a stored `ID` or `VN` wins; a stored `null` falls back to the payload; any other stored value reads as `ID` | Closes the PATCH-versus-start race; defensive for odd values |
+| Start route (VM-FR-24, A13) | 409 unless `draft` or `failed` | Same, plus a successful start returns 202. A `completed` campaign cannot be re-run | Prevents re-running a finished campaign into mixed state |
+| Bulk approve (VM-FR-25) | Landline guard at approve | Bulk approve fails the whole batch with 400 when any draft's lead is a landline or service number | Nothing is partially approved; the owner fixes the batch |
+| Guard inputs (VM-FR-25) | Guard on the lead's number | The guard checks both `lead.phoneE164` and the message `toPhone` | A message can carry a number that differs from the lead's stored one |
+| `createManual` service rule (VM-FR-10, A17) | `service` classification for raw input | Applied only when `defaultCountryCode` is `84` | Service-number patterns are Vietnamese; ID input is unchanged |
+| Suggested timezone (VM-FR-16, A10) | Panel initial value from the most recent campaign's market | `suggestedTimezone` applies to an untouched WhatsApp account only (no paired phone and the timezone still `Asia/Jakarta`), and to the email panel only when no account exists | Never overrides a value the owner or an account already set |
+| Market i18n keys (VM-FR-20) | `camp.market.ID` / `camp.market.VN` keys | No such keys: `marketName()` (a constant in `lib/market-ui.ts`) provides the names. 10 keys were added (857 to 867 in total) | Country names are the same in both UI languages |
+| Compliance line (VM-FR-26, VM-OQ-7) | Static risk notice, to be checked against the decrees | The wording cites Decree 91/2020/ND-CP and Decree 13/2023/ND-CP, with "may apply" phrasing. Whether they were amended since is not confirmed; owner and legal sign-off is pending | Not legal advice; see limitations |
+| Scoring (VM-FR-17) | Landline loses the `+15` | Landline **and** VN service numbers lose the `+15`; `findAll` also returns `phoneKind` | A service number cannot receive WhatsApp either; the list needs the kind |
+| Fixture leads for VN (VM-FR-22, QA TC-VM-8.1 / 8.5) | No phone in fixture leads | `fixtureLeads` for VN carries phones and coordinates; the QA "no phone" text is outdated for VN. The province is passed to `createMany` (a defect fixed in S8) | Needed for end-to-end region and phone checks |
+| Oversized body (QA) | 400 | `http-exception.filter` fix: an oversized body is 413, not 500 (QA expected 400) | The filter turned 413 into 500; 413 is the correct status |
+| Outbox template panel | Not stated | Lists only `google_maps` leads; fixture leads never appear | Existing behaviour, noticed in e2e |
+| S1 static source check | Literals removed from the scraper | The check passes because the literals are kept in a comment in `google-maps.scraper.ts` | The S1 check must stay unedited |
+
+#### Known limitations and not covered
+
+| Item | Status | Note |
+|------|--------|------|
+| Vietnamese Maps strings and selectors | **Simulated** | Never run against real Maps; a real-run check (2.10) was not done |
+| Province source | **Owner review** | Nghi quyet 202/2025/QH15; the list was built from two summaries because the Gazette text could not be fetched |
+| VN city list (VM-OQ-8) | **Owner review** | Ordered list of search terms, not confirmed |
+| Compliance wording | **Pending sign-off** | See the compliance row above |
+| Development database | **Open** | The dev DB got the column through `prisma db push`; the migration chain was verified on scratch databases; the owner runs `db:deploy` on other databases |
+| `prisma generate` | **Tooling** | `pnpm --filter @prospex/database exec prisma generate` fails on the author's machine; `packages/database/node_modules/.bin/prisma generate` works |
+| TC-VM-19.3 | **Not covered** | The API-key route does not exist (as in 1/OQ-4, `ApiKeyGuard` is not applied to any controller) |
+| TC-VM-3.10 | **Not covered** | Concurrent PATCH versus start, 20 times |
+| Test status | Last full run | API unit tests 918 pass; e2e 209 pass, 2 skipped (need a real AI key), 0 fail; `pipeline-check` 92 PASS; S1 snapshots unedited |
