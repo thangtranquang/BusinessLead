@@ -10,12 +10,14 @@ import { FitService } from "../ai/fit.service";
 import { MarketingAiService } from "../ai/marketing-ai.service";
 import { planAreas, stripPlaces } from "./areas";
 import { toOutputLanguage } from "../common/language";
+import { MARKET, normalizeMarket, type Market } from "../common/market";
 import { GoogleMapsScraperService } from "./google-maps.scraper";
 
 /** Two results are the same business when they share a phone number, or else a name and an address. */
-export function leadKey(b: { name: string; address: string; phone: string }): string {
+export function leadKey(b: { name: string; address: string; phone: string }, market: Market = "ID"): string {
   const digits = (b.phone ?? "").replace(/\D/g, "");
-  return digits.length >= 8 ? `tel:${digits.replace(/^0/, "62")}` : `${b.name.toLowerCase()}|${b.address.toLowerCase()}`;
+  // the leading 0 of a national number becomes the market's calling code (62 for Indonesia, 84 for Vietnam)
+  return digits.length >= 8 ? `tel:${digits.replace(/^0/, MARKET[normalizeMarket(market)].callingCode)}` : `${b.name.toLowerCase()}|${b.address.toLowerCase()}`;
 }
 
 export interface ScraperJobData {
@@ -28,6 +30,18 @@ export interface ScraperJobData {
   yourService: string;
   contentStyle: string;
   language: string;
+  /** The campaign's market when the job was queued. The campaign row read at job start wins; jobs queued before this field exist read as ID. */
+  market?: string;
+}
+
+/**
+ * The market a job runs in. The campaign's stored value wins (it may have been edited while the job waited); the payload is
+ * only used when the row has no value; anything unknown reads as ID. Never throws.
+ */
+export function resolveJobMarket(dbValue: unknown, jobValue: unknown): Market {
+  if (dbValue === "ID" || dbValue === "VN") return dbValue;
+  if (dbValue === undefined || dbValue === null) return normalizeMarket(jobValue);
+  return "ID";
 }
 
 @Processor("scraper")
@@ -56,9 +70,12 @@ export class ScraperProcessor extends WorkerHost {
     this.logger.log(`Starting campaign ${campaignId} (job ${job.id})`);
 
     try {
+      // the campaign may have been edited while the job waited in the queue: the row decides, the payload is a fallback
+      const stored = await this.campaigns.findOne(campaignId, workspaceId).catch(() => null);
+      const market = resolveJobMarket((stored as { market?: unknown } | null)?.market, data.market);
       await this.campaigns.updateStatus(campaignId, "running", 0);
 
-      const rawLeads = await this.scrapeLeads(data, campaignId);
+      const rawLeads = await this.scrapeLeads(data, campaignId, market);
       const total = rawLeads.length;
 
       if (total === 0) {
@@ -152,11 +169,11 @@ export class ScraperProcessor extends WorkerHost {
     }
   }
 
-  private async scrapeLeads(data: ScraperJobData, campaignId: string) {
+  private async scrapeLeads(data: ScraperJobData, campaignId: string, market: Market = "ID") {
     // "Seluruh Indonesia" becomes one search per city: Google ranks a country-wide search by where the searcher is.
-    const plan = planAreas(data.location, data.searchQueries.length, data.maxResults);
+    const plan = planAreas(data.location, data.searchQueries.length, data.maxResults, market);
     // City by city across all queries, so a stop part-way still covers the biggest markets for every query.
-    const combos = plan.areas.flatMap((area) => data.searchQueries.map((query) => ({ query: `${stripPlaces(query, plan.areas)} ${area}`.trim(), area })));
+    const combos = plan.areas.flatMap((area) => data.searchQueries.map((query) => ({ query: `${stripPlaces(query, plan.areas, market)} ${area}`.trim(), area })));
     const perQuery = plan.perSearch;
     if (plan.nationwide) this.logger.log(`Nationwide campaign: ${plan.areas.length} cities x ${data.searchQueries.length} queries, ${perQuery} results each`);
     const results: ReturnType<typeof this.normalizeRaw>[] = [];
@@ -165,7 +182,7 @@ export class ScraperProcessor extends WorkerHost {
 
     const unique = new Set<string>();
     const countNew = (list: { name: string; address: string; phone: string }[]) => {
-      for (const b of list) unique.add(leadKey(b));
+      for (const b of list) unique.add(leadKey(b, market));
       return unique.size;
     };
 
@@ -179,7 +196,7 @@ export class ScraperProcessor extends WorkerHost {
         results.push(...this.fixtureLeads(data, combo.query, combo.area, perQuery));
       } else {
         try {
-          const raw = await this.googleMaps.scrape(combo.query, perQuery, { area: combo.area });
+          const raw = await this.googleMaps.scrape(combo.query, perQuery, { area: combo.area, market });
           results.push(...raw.map((b) => this.normalizeRaw(b, data.industry)));
           this.logger.log(`Query "${combo.query}": ${raw.length} results`);
           // A short random pause between searches: hundreds of searches in a row from one address look like a robot.
@@ -199,7 +216,7 @@ export class ScraperProcessor extends WorkerHost {
     // Deduplicate: the same listing can come up under several cities and queries.
     const seen = new Set<string>();
     return results.filter((b) => {
-      const key = leadKey(b);
+      const key = leadKey(b, market);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;

@@ -1,4 +1,4 @@
-import { Controller, Post, Param, HttpCode, HttpStatus, UseGuards } from "@nestjs/common";
+import { Controller, Post, Param, HttpCode, HttpStatus, UseGuards, ConflictException } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
@@ -27,6 +27,8 @@ export class ScraperController {
     @WorkspaceId() workspaceId: string,
   ) {
     const campaign = await this.campaigns.findOne(id, workspaceId);
+    // a running or finished campaign is not started again: a second job would scrape and score the same leads twice
+    if (campaign.status !== "draft" && campaign.status !== "failed") throw new ConflictException("The campaign can only be started while it is a draft or has failed");
     await this.limits.assertCan(workspaceId, "scrape");
     await this.limits.record(workspaceId, "scrape");
     const job = await this.scraperQueue.add(
@@ -41,6 +43,7 @@ export class ScraperController {
         yourService: campaign.yourService,
         contentStyle: campaign.contentStyle,
         language: campaign.language,
+        market: campaign.market,
       },
       {
         attempts: 2,

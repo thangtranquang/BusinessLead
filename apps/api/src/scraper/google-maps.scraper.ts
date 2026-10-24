@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { chromium, Browser, BrowserContext, Page } from "playwright";
-import { normalizeRating, pickCategory } from "./maps-parse";
+import { FEED_FALLBACK_SELECTOR, SEARCH_BOX_SELECTOR, isEndOfList, parseCard, type RawCard } from "./maps-parse";
+import { buildAreaUrl, buildSearchUrl, contextOptions } from "./maps-urls";
+import { normalizeMarket, type Market } from "../common/market";
 import { DEFAULT_RADIUS_KM, inArea, type LatLng } from "./areas";
 
 export interface ScrapedBusiness {
@@ -52,13 +54,13 @@ export class GoogleMapsScraperService {
   /** Where an area is, found once through Google Maps itself and remembered. Null when Maps does not say. */
   private readonly centers = new Map<string, LatLng | null>();
 
-  private async locate(context: BrowserContext, area: string): Promise<LatLng | null> {
-    const key = area.trim().toLowerCase();
+  private async locate(context: BrowserContext, area: string, market: Market): Promise<LatLng | null> {
+    const key = `${market}|${area.trim().toLowerCase()}`;
     if (this.centers.has(key)) return this.centers.get(key) ?? null;
     const page = await context.newPage();
     let found: LatLng | null = null;
     try {
-      await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(`${area}, Indonesia`)}?hl=id`, { waitUntil: "domcontentloaded", timeout: 45000 });
+      await page.goto(buildAreaUrl(area, market), { waitUntil: "domcontentloaded", timeout: 45000 });
       for (let i = 0; i < 18 && !found; i++) {
         await page.waitForTimeout(500);
         const c = extractLatLng(page.url());
@@ -78,12 +80,14 @@ export class GoogleMapsScraperService {
    * One Google Maps search. With `opts.area` the search is anchored on that place's coordinates, so the answer does not
    * depend on where the server (or the person running it) is, and results that turn out to be outside the area are dropped.
    */
-  async scrape(searchQuery: string, maxResults = 20, opts: { area?: string; radiusKm?: number } = {}): Promise<ScrapedBusiness[]> {
+  async scrape(searchQuery: string, maxResults = 20, opts: { area?: string; radiusKm?: number; market?: Market } = {}): Promise<ScrapedBusiness[]> {
+    const market = normalizeMarket(opts.market);
     const browser = await this.getBrowser();
-    // Indonesian locale and timezone, so listings come back in Indonesian whatever the server's own locale is.
+    // The market's locale and timezone, so listings come back in its language whatever the server's own locale is.
+    // Indonesia (the default) is id-ID / Asia/Jakarta, searched as `<area>, Indonesia` with ?hl=id and anchored at /@lat,lng,13z;
+    // the addresses are built in maps-urls.ts. Vietnam is vi-VN / Asia/Ho_Chi_Minh, `<area>, Việt Nam`, hl=vi (SIMULATED: no real run).
     const context = await browser.newContext({
-      locale: "id-ID",
-      timezoneId: "Asia/Jakarta",
+      ...contextOptions(market),
       viewport: { width: 1280, height: 800 },
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     });
@@ -94,18 +98,18 @@ export class GoogleMapsScraperService {
       const safeQuery = String(searchQuery)
         .replace(/[\x00-\x1f<>"'`]/g, "")
         .substring(0, 200);
-      const center = opts.area ? await this.locate(context, opts.area) : null;
+      const center = opts.area ? await this.locate(context, opts.area, market) : null;
 
       this.logger.log(`Searching Google Maps: "${safeQuery}"${center ? ` anchored at ${center.lat.toFixed(3)},${center.lng.toFixed(3)}` : ""}`);
 
       if (center) {
-        await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(safeQuery)}/@${center.lat},${center.lng},13z?hl=id`, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.goto(buildSearchUrl(safeQuery, center.lat, center.lng, market), { waitUntil: "domcontentloaded", timeout: 60000 });
         await page.waitForSelector('[role="feed"]', { timeout: 15000 }).catch(() => undefined);
         await page.waitForTimeout(1500);
       } else {
         await page.goto("https://www.google.com/maps/", { waitUntil: "domcontentloaded", timeout: 60000 });
         await page.waitForTimeout(2000);
-        const searchBox = await page.$('#searchboxinput, input[name="q"], [aria-label="Search Google Maps"]');
+        const searchBox = await page.$(SEARCH_BOX_SELECTOR);
         if (searchBox) {
           await searchBox.click({ clickCount: 3 });
           await page.keyboard.type(safeQuery, { delay: 40 });
@@ -116,7 +120,7 @@ export class GoogleMapsScraperService {
 
       await this.scrollResultsList(page, maxResults);
 
-      let businesses = await this.extractBusinessCards(page);
+      let businesses = await this.extractBusinessCards(page, market);
       if (center && opts.area) {
         const { kept, dropped } = inArea(businesses, opts.area, center, opts.radiusKm ?? DEFAULT_RADIUS_KM);
         if (dropped > 0) this.logger.warn(`"${safeQuery}": dropped ${dropped} of ${businesses.length} results outside ${opts.area}`);
@@ -137,9 +141,9 @@ export class GoogleMapsScraperService {
     // The results list is the element with role="feed". Matching several selectors at once picks the first one in the page,
     // which was a wrapper that cannot scroll, so every search stopped after the first six results.
     const feedSelector = '[role="feed"]';
-    const fallbackSelector = '.m6QErb.DxyBCb, .m6QErb, [aria-label*="Results"], [aria-label*="Hasil"]';
+    const fallbackSelector = FEED_FALLBACK_SELECTOR;
     const cardCount = () => page.evaluate(() => document.querySelectorAll('[data-result-index], .Nv2PK, [jsaction*="mouseover:pane"]').length).catch(() => 0);
-    const reachedEnd = () => page.evaluate(() => /Anda telah mencapai akhir|You've reached the end/i.test(document.body.innerText)).catch(() => false);
+    const reachedEnd = () => page.evaluate(() => document.body.innerText).then((text) => isEndOfList(text)).catch(() => false);
 
     let stale = 0;
     let prev = 0;
@@ -162,10 +166,10 @@ export class GoogleMapsScraperService {
     }
   }
 
-  private async extractBusinessCards(page: Page): Promise<ScrapedBusiness[]> {
-    // $$eval is Playwright's scoped DOM query — the callback is a static inline
-    // function serialized and run in the browser context. No user-supplied data
-    // flows into the function body, so there is no injection risk here.
+  private async extractBusinessCards(page: Page, market: Market): Promise<ScrapedBusiness[]> {
+    // $$eval is Playwright's scoped DOM query — the callback is a static inline function serialized and run in the browser
+    // context. Nothing is passed into it (no market, no user text): it only hands back RAW text, and Node reads it with the
+    // pure helpers in maps-parse.ts for the campaign's market (phone clean-up included).
     const cards = await page
       .$$eval(".Nv2PK, [data-result-index]", (cards) =>
         cards
@@ -180,75 +184,25 @@ export class GoogleMapsScraperService {
               }
             }
             if (!name) return null;
-
-            // The rating wrapper's aria-label usually reads like "4.5 stars 1,234 Reviews" —
-            // parse both the star value and the review count from it when present.
-            let rating = "";
-            let reviewCount: number | null = null;
-            const ratingWrap = card.querySelector('[aria-label*="star" i]');
-            const ariaLabel = ratingWrap?.getAttribute("aria-label") ?? "";
-            const ratingMatch = ariaLabel.match(/([\d.]+)\s*star/i);
-            const reviewMatch = ariaLabel.match(/([\d.,]+)\s*review/i);
-            if (ratingMatch) rating = ratingMatch[1];
-            if (reviewMatch) reviewCount = parseInt(reviewMatch[1].replace(/[.,]/g, ""), 10);
-
-            if (!rating) {
-              const rEl = card.querySelector(".MW4etd");
-              if (rEl) rating = rEl.textContent?.trim() ?? "";
-            }
-
-            let address = "";
-            let phone = "";
-            for (const span of card.querySelectorAll("span")) {
-              const t = span.textContent?.trim() ?? "";
-              if (!t || t.length < 3) continue;
-              if (!phone && /^[+\d]/.test(t) && t.replace(/\D/g, "").length >= 7) {
-                if (t.includes("+62") || t.includes("08") || /^\d{3}[\s-]\d/.test(t)) {
-                  phone = t;
-                  continue;
-                }
-              }
-              if (!address && /\bJl\.|\bJalan\b|\bStreet\b|\bSt\.|\bRd\.|\bNo\.\s*\d/i.test(t)) {
-                address = t.replace(/^[·•–]\s*/, "").trim();
-              }
-              if (reviewCount === null) {
-                const m = t.match(/^\(([\d.,]+)\)$/);
-                if (m) reviewCount = parseInt(m[1].replace(/[.,]/g, ""), 10);
-              }
-            }
-
-            let website = "";
-            let referenceLink = "";
-            for (const a of card.querySelectorAll("a[href]")) {
-              const href = (a as HTMLAnchorElement).href ?? "";
-              if (href.includes("google.com/maps/place") && !referenceLink) referenceLink = href;
-              else if (!website && /https?:\/\//.test(href) && !href.includes("google.com"))
-                website = href;
-            }
-
             return {
               name,
-              address,
-              phone: phone.replace(/\D/g, "").replace(/^62/, "0").replace(/^0+/, "0"),
-              rating: rating || "N/A",
-              reviewCount,
+              // The rating wrapper's aria-label reads like "4.5 stars 1,234 Reviews" (SIMULATED for Vietnamese: "4,6 sao").
+              ariaStar: card.querySelector('[aria-label*="star" i]')?.getAttribute("aria-label") ?? "",
+              ariaSao: card.querySelector('[aria-label*="sao" i]')?.getAttribute("aria-label") ?? "",
+              ratingText: card.querySelector(".MW4etd")?.textContent?.trim() ?? "",
+              spans: [...card.querySelectorAll("span")].map((s) => s.textContent?.trim() ?? ""),
               rows: [...card.querySelectorAll(".W4Efsd")].map((r) => r.textContent?.trim() ?? ""),
-              website,
-              hasWebsite: !!website,
-              referenceLink,
-              source: "Google Maps",
+              hrefs: [...card.querySelectorAll("a[href]")].map((a) => (a as HTMLAnchorElement).href ?? ""),
             };
           })
           .filter((c): c is NonNullable<typeof c> => c !== null),
       )
-      .catch(() => []);
+      .catch(() => [] as RawCard[]);
 
-    return (cards as Array<Omit<ScrapedBusiness, "category" | "lat" | "lng"> & { rows: string[] }>).map(({ rows, ...card }) => ({
-      ...card,
-      rating: card.rating === "N/A" ? "N/A" : normalizeRating(card.rating) || "N/A",
-      category: pickCategory(rows),
-      ...extractLatLng(card.referenceLink),
-    }));
+    return (cards as RawCard[]).map((raw) => {
+      const card = parseCard(raw, market);
+      return { ...card, source: "Google Maps", ...extractLatLng(card.referenceLink) };
+    });
   }
 
   async close(): Promise<void> {

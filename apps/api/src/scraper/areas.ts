@@ -4,6 +4,10 @@
  * one search per city, from the biggest markets down.
  */
 
+import { MARKET, normalizeMarket, type Market } from "../common/market";
+import { capThenNfc, sliceChars } from "../common/text";
+import { resolveVnPlace, splitAreasVn, stripPlacesVn, vnFolded, VN_AREA_CAP, VN_NATIONWIDE } from "./areas-vn";
+
 /** Roughly by market size. Real cities and regencies; the order decides which ones a smaller campaign uses. */
 export const INDONESIA_CITIES = [
   "Jakarta", "Surabaya", "Bandung", "Medan", "Semarang", "Makassar", "Palembang", "Tangerang", "Depok", "Bekasi",
@@ -20,8 +24,14 @@ const PLACE_ALIASES = ["Jogja", "Jogjakarta", "Yogya", "DIY", "Solo", "Bali", "J
 
 const NATIONWIDE = /^(seluruh|semua|se)\s*indonesia$|^indonesia$|^nasional$|^all\s+indonesia$|^whole\s+indonesia$|^nationwide$/i;
 
-export function isNationwide(location: string): boolean {
+export function isNationwide(location: string, market: Market = "ID"): boolean {
+  if (normalizeMarket(market) === "VN") return VN_NATIONWIDE.has(vnFolded(location));
   return NATIONWIDE.test(location.trim());
+}
+
+/** The one place a typed name stands for: Vietnam resolves aliases ("TP.HCM", "Saigon") to the city list's spelling; Indonesia keeps what was typed. */
+export function resolvePlace(text: string, market: Market = "ID"): string {
+  return normalizeMarket(market) === "VN" ? resolveVnPlace(text) : text.trim();
 }
 
 /** Searches an average rental query returns that carry a phone number: a deliberately cautious guess, used only to size the plan. */
@@ -40,16 +50,19 @@ export interface AreaPlan {
  * A comma-separated list stays as typed. "Seluruh Indonesia" becomes enough cities to reach `maxResults` with room for
  * duplicates, never fewer than 8 and never more than the list holds.
  */
-export function planAreas(location: string, queryCount: number, maxResults: number): AreaPlan {
-  const typed = splitAreas(location);
-  if (!isNationwide(location)) {
+export function planAreas(location: string, queryCount: number, maxResults: number, market: Market = "ID"): AreaPlan {
+  const m = normalizeMarket(market);
+  location = m === "VN" ? capThenNfc(location, VN_AREA_CAP) : sliceChars(location, VN_AREA_CAP); // hostile input: bounded before any pattern runs
+  const typed = splitAreas(location, m);
+  if (!isNationwide(location, m)) {
     const areas = typed.length ? typed : [location.trim()];
     return { areas, perSearch: Math.max(1, Math.ceil(maxResults / Math.max(1, queryCount * areas.length))), nationwide: false };
   }
   const q = Math.max(1, queryCount);
   const wanted = Math.ceil((maxResults * SAFETY) / (q * USABLE_PER_SEARCH));
-  const count = Math.min(INDONESIA_CITIES.length, Math.max(8, wanted));
-  const areas = INDONESIA_CITIES.slice(0, count) as unknown as string[];
+  const cities: readonly string[] = m === "VN" ? MARKET.VN.cities : INDONESIA_CITIES;
+  const count = Math.min(cities.length, Math.max(8, wanted));
+  const areas = cities.slice(0, count) as string[];
   const perSearch = Math.min(MAX_PER_SEARCH, Math.max(USABLE_PER_SEARCH, Math.ceil((maxResults * SAFETY) / (q * count))));
   return { areas, perSearch, nationwide: true };
 }
@@ -60,8 +73,9 @@ export function planAreas(location: string, queryCount: number, maxResults: numb
  * "yogyakarta, medan dan semarang", "Solo & Jogja", "Medan; Batam" or one city per line. Treating those as one long
  * place name made Google search only the first city, near the searcher.
  */
-export function splitAreas(location: string): string[] {
-  const parts = location
+export function splitAreas(location: string, market: Market = "ID"): string[] {
+  if (normalizeMarket(market) === "VN") return splitAreasVn(location);
+  const parts = sliceChars(location, VN_AREA_CAP)
     .split(/[,;\n\r|\/+]|\s&\s|\s+(?:dan|and|serta|atau|plus)\s+/i)
     .map((a) => {
       let x = a.trim();
@@ -79,7 +93,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * Removes place names from a search phrase so the campaign's areas decide where to look. A query like "sewa kamera Solo"
  * searched together with area "Medan" would otherwise become "sewa kamera Solo Medan", which Google answers near Solo.
  */
-export function stripPlaces(query: string, typedAreas: string[] = []): string {
+export function stripPlaces(query: string, typedAreas: string[] = [], market: Market = "ID"): string {
+  if (normalizeMarket(market) === "VN") return stripPlacesVn(query, typedAreas);
+  query = sliceChars(query, VN_AREA_CAP);
   const places = [...INDONESIA_CITIES, ...PLACE_ALIASES, ...typedAreas].map((p) => p.trim()).filter((p) => p.length > 1).sort((a, b) => b.length - a.length);
   let out = query;
   for (const p of places) out = out.replace(new RegExp(`(^|\\s)(?:di\\s+)?${escapeRe(p)}(?=\\s|$)`, "gi"), " ");

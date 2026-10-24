@@ -8,7 +8,7 @@ import { ScraperProcessor, type ScraperJobData } from "./scraper.processor";
 
 async function runJob(language: unknown) {
   const seen: { fit: unknown[]; content: unknown[] } = { fit: [], content: [] };
-  const campaigns = { updateStatus: async () => ({}), updateStats: async () => ({}) };
+  const campaigns = { findOne: async () => ({ market: "ID" }), updateStatus: async () => ({}), updateStats: async () => ({}) };
   const leads = { createMany: async () => ({}) };
   const leadIntelligence = {
     scoreLeads: (raw: { name: string }[]) => raw.map((l) => ({ ...l, score: 80, priority: "HIGH", factors: [], recommendation: "x" })),
