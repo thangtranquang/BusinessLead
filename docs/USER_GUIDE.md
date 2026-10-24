@@ -174,6 +174,7 @@ Bạn vẫn có thể điền biểu mẫu mà không cần nguồn:
 | Tên chiến dịch | "Cho thuê máy ảnh Quý 4 2026" | Tên để nhận biết |
 | Loại hình doanh nghiệp mục tiêu | cho thuê máy ảnh | **Loại hình doanh nghiệp bạn muốn tìm**, không phải ngành của chính bạn. Văn bản tự do; không có danh sách cố định vì danh mục Google Maps rất đa dạng. |
 | Địa điểm | một thành phố | Thành phố hoặc khu vực mục tiêu. Nhiều khu vực ngăn cách bằng dấu phẩy, dấu chấm phẩy, `/`, `&`, `+`, "dan" hoặc xuống dòng. Thành phố bạn gõ được tìm đúng ở thành phố đó (kết quả cách trung tâm hơn khoảng 50 km bị loại). Gõ **Seluruh Indonesia** để chạy một lượt tìm cho mỗi thành phố của Indonesia, bắt đầu từ thành phố lớn nhất. |
+| Thị trường | Việt Nam | Quốc gia bạn bán hàng: Indonesia hoặc Việt Nam (xem [Thị trường của chiến dịch](#thị-trường-của-chiến-dịch)). Giao diện tiếng Việt gợi ý sẵn Việt Nam, giao diện tiếng Anh gợi ý Indonesia; bạn có thể đổi lại. |
 | Từ khóa tìm kiếm | "thuê máy ảnh" | Như bạn gõ trên Google Maps. Có thể nhiều từ khóa. |
 | Dịch vụ / sản phẩm của bạn | "Phần mềm quản lý cho thuê dành cho cửa hàng cho thuê máy ảnh" | Điều bạn cung cấp cho các khách hàng tiềm năng này |
 | Số kết quả tối đa | 20 | Số khách hàng tiềm năng mục tiêu (10 đến 1.500 trên biểu mẫu; API nhận đến 2.000). Với mục tiêu lớn, dùng "Seluruh Indonesia" và nhiều từ khóa. Chiến dịch dừng ngay khi đạt mục tiêu. |
@@ -182,7 +183,29 @@ Bạn vẫn có thể điền biểu mẫu mà không cần nguồn:
 
 Bấm **Bắt đầu chiến dịch**: hệ thống bắt đầu tìm trên Google Maps và chấm điểm kết quả ngay.
 
-> **Giới hạn hiện tại về thị trường.** Phần tìm kiếm Google Maps (ngôn ngữ trình duyệt, danh sách thành phố và khu vực, mã quốc gia điện thoại mặc định `62`) vẫn được điều chỉnh cho thị trường Indonesia và chưa được kiểm thử riêng cho Việt Nam. Hỗ trợ tiếng Việt hiện chỉ áp dụng cho giao diện và cho văn bản AI soạn; Prospex chưa tự tìm khách hàng tiềm năng tại Việt Nam một cách đã được kiểm chứng.
+> **Lưu ý về thị trường Việt Nam.** Cách đọc trang Google Maps tiếng Việt mới chỉ được kiểm thử bằng dữ liệu mẫu tự dựng, **chưa chạy thử trên Google Maps thật**. Hãy kiểm tra thủ công vài kết quả đầu tiên (tên, địa chỉ, số điện thoại, đánh giá) trước khi tin vào cả danh sách. Chi tiết ở mục [Thị trường của chiến dịch](#thị-trường-của-chiến-dịch).
+
+### Thị trường của chiến dịch
+
+Mỗi chiến dịch bán ở một thị trường: **Indonesia** hoặc **Việt Nam**. Chọn ở trường **Thị trường**, cạnh trường **Địa điểm**. Thị trường quyết định cách Prospex tìm trên Google Maps, đọc số điện thoại và đặt múi giờ gợi ý cho Outbox; nó không tự đổi ngôn ngữ soạn tin (trường **Ngôn ngữ** vẫn riêng).
+
+Khi chọn **Việt Nam**:
+
+- **Địa điểm:** gõ như `ví dụ: TP.HCM, Hà Nội`. Ngăn cách các địa điểm bằng dấu phẩy; mỗi địa điểm được tìm riêng. Gõ "toàn quốc" (hoặc "cả nước", "Việt Nam") để tìm trên cả nước: Prospex tìm theo từng thành phố lớn, thành phố đông dân trước. Các cách gọi như "TP.HCM", "Sài Gòn", "thành phố Hồ Chí Minh" được hiểu là cùng một nơi.
+- **Tìm kiếm:** Prospex mở Google Maps bằng giao diện tiếng Việt (`hl=vi`) và múi giờ Asia/Ho_Chi_Minh, và thêm ", Việt Nam" vào địa điểm.
+- **Số điện thoại:** `090…`, `+84 90…`, `84 90…` hay số di động 9 chữ số viết không có số 0 đầu đều được hiểu thành `849…`.
+- **Điện thoại bàn và tổng đài:** số điện thoại bàn (bắt đầu bằng `02…`) và số tổng đài (`1800`, `1900`) **không dùng được WhatsApp**. Khách hàng có số như vậy hiện dòng "Điện thoại bàn: không nhận được WhatsApp" (hoặc "Số tổng đài: không dùng được WhatsApp") ở chi tiết khách hàng và ở bảng mẫu tin nhắn, không được cộng điểm vì có số điện thoại, và không tạo được bản nháp WhatsApp. Nếu bạn duyệt cùng lúc nhiều bản nháp mà có một bản gửi tới số điện thoại bàn, hệ thống từ chối **cả lô** với thông báo "Not a mobile number" và không duyệt bản nào: hãy bỏ bản nháp đó rồi duyệt lại. Hệ thống kiểm tra thêm một lần nữa ngay trước khi gửi.
+- **Bản đồ khách hàng:** mở ở TP. Hồ Chí Minh khi chưa có khách hàng nào có tọa độ và chiến dịch mới nhất là Việt Nam. Tỉnh/thành của khách hàng được lấy theo 34 tỉnh, thành phố hiện hành.
+- **Múi giờ gợi ý:** tài khoản Outbox mới (chưa ghép số, múi giờ còn là Asia/Jakarta) bắt đầu với Asia/Ho_Chi_Minh khi chiến dịch mới nhất là Việt Nam. Tài khoản đã cài đặt thì không bị đổi.
+- **Thông tin rủi ro pháp lý:** biểu mẫu hiện một dòng, không chặn bạn tiếp tục: "Quy định của Việt Nam về tin nhắn thương mại không mong muốn (Nghị định 91/2020/NĐ-CP) và về dữ liệu cá nhân (Nghị định 13/2023/NĐ-CP) có thể áp dụng cho hoạt động tiếp cận này. Đây là thông tin về rủi ro để bạn trao đổi với tư vấn pháp lý, không phải tư vấn pháp lý." Prospex không khẳng định hoạt động của bạn hợp pháp; hãy trao đổi với tư vấn pháp lý của bạn.
+
+Quy tắc cần nhớ:
+
+- Thị trường **chỉ đổi được khi chiến dịch còn là Bản nháp**; sau đó hệ thống từ chối với lỗi 409. Muốn bán ở thị trường khác, tạo chiến dịch mới.
+- Chỉ **Bắt đầu** được chiến dịch ở trạng thái **Bản nháp** hoặc **Thất bại**. Chiến dịch đã **Hoàn tất** không chạy lại được (lỗi 409): hãy tạo chiến dịch mới.
+- Chiến dịch cũ không có thị trường được hiểu là **Indonesia**; cách làm việc của chúng không đổi.
+
+Giới hạn hiện tại: cách đọc Google Maps tiếng Việt chỉ mới được thử bằng dữ liệu mẫu; danh sách tỉnh/thành cần được đối chiếu lại với Công báo; danh sách 30 thành phố cho tìm "toàn quốc" và dòng thông tin pháp lý cần chủ sở hữu hoặc tư vấn pháp lý xem lại.
 
 ### Ngôn ngữ soạn tin
 
@@ -387,8 +410,8 @@ Bấm **Giới hạn** để cài đặt:
 | Số tin mỗi giờ | 10 | 1 đến 30. Càng thấp càng an toàn. |
 | Số tin mỗi ngày | 80 | 1 đến 200 |
 | Không gửi từ (giờ) / Không gửi đến (giờ) | 21:00 đến 07:00 | Tin chờ cho đến hết giờ không gửi |
-| Múi giờ | Asia/Jakarta | Đổi sang múi giờ của bạn, ví dụ Asia/Ho_Chi_Minh |
-| Mã quốc gia mặc định | 62 | Dùng cho số viết không có mã quốc gia. Với số Việt Nam hãy đặt 84. |
+| Múi giờ | Asia/Jakarta | Đổi sang múi giờ của bạn, ví dụ Asia/Ho_Chi_Minh. Với tài khoản mới chưa ghép số, ô này bắt đầu bằng múi giờ gợi ý từ thị trường của chiến dịch mới nhất (Asia/Ho_Chi_Minh cho Việt Nam). |
+| Mã quốc gia mặc định | 62 | Chỉ dùng cho số **bạn tự nhập** không có mã quốc gia. Khách hàng của chiến dịch Việt Nam tự động dùng +84 bất kể cài đặt này. Nếu có chiến dịch Việt Nam mà mã vẫn là 62, hệ thống hiện thông báo: "Mã quốc gia WhatsApp của bạn là +62 nhưng bạn có chiến dịch Việt Nam: khách hàng tiềm năng ở Việt Nam tự động dùng +84; mã này chỉ áp dụng cho số bạn tự nhập." Hãy đặt 84 nếu bạn tự gõ số Việt Nam. |
 
 Khoảng nghỉ giữa các tin được làm ngẫu nhiên (0,6 đến 1,4 lần mức trung bình) và "đang soạn tin…" hiện trước mỗi tin được gửi. Với cài đặt mặc định, một danh sách 1.500 khách hàng tiềm năng xong sau khoảng **19 ngày**. Nâng giới hạn ngày lên 140 rút còn khoảng 11 ngày. Ở mức 20 tin mỗi giờ và 200 mỗi ngày, 1.000 khách hàng tiềm năng xong sau khoảng 5 ngày. Ở 20 tin mỗi giờ, cứ khoảng ba phút có một tin được gửi; hàng đợi dài chậm là có chủ ý. Hãy bắt đầu với 30 đến 50 khách hàng tiềm năng, xem bao nhiêu người trả lời và số điện thoại còn khỏe không, rồi mới tăng.
 

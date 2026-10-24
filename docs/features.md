@@ -100,6 +100,30 @@ Details: [whatsapp-outbox.md](whatsapp-outbox.md).
 | **Self-hosting** | Docker Compose for local and production (PostgreSQL with pgvector, Redis, API, web, Nginx). WhatsApp sessions on a persistent volume. | Partial: compose files validated, a full production deployment has not been exercised |
 | **Any OpenAI-compatible AI** | OpenAI, OpenRouter, Ollama, or your own endpoint. Set in the server `.env`. | Verified with Ollama |
 
+## 7. Markets (Indonesia and Vietnam)
+
+A campaign has a market, `ID` (default over the API) or `VN`, chosen in New campaign. See the [README](../README.md#markets) for what changes and the upgrade notes.
+
+| Feature | What it does and why | Where | Status |
+|---------|----------------------|-------|--------|
+| **Vietnam market** | Per-campaign `market` (`ID` or `VN`; anything else, `null` and `""` return 400). The market can be changed only while the campaign is a draft (409 otherwise); a campaign can be started only from draft or failed (409 otherwise, so a completed campaign is no longer re-run). A lead's market is its campaign's market. Indonesian behaviour is pinned by regression tests written first. | New campaign, API | **Verified**: unit tests, API tests against a running server and a real database (fixture scraper), migration `20261024000000_campaign_market` checked on scratch databases |
+| **Vietnamese phone normalisation and WhatsApp reachability** | Under `VN`, `090…`, `+84 90…`, `0084…` and a bare nine-digit mobile become `849…`; the trunk zero after `84` is dropped; text over 64 characters, `1800`/`1900` numbers and numbers outside 8 to 15 digits are refused. Each stored number is classed mobile (`84` + 9 digits starting 3, 5, 7, 8, 9), landline (`84` + `2` + 8 or 9 digits) or service (`1800`/`1900`) or unknown. Indonesian numbers are classed unknown (no rule). | Leads, Outbox | **Verified by unit tests** (hostile-input and time-limit tests included) with invented numbers; the numbering plan was checked online |
+| **Google Maps in Vietnamese** | The scraper searches with `hl=vi`, locale `vi-VN` and time zone `Asia/Ho_Chi_Minh`, suffixes areas with ", Việt Nam", resolves Vietnamese place names and aliases, expands "toàn quốc" into 30 cities, and reads cards in Node (`parseCard`) with Vietnamese labels for ratings, reviews, categories, addresses and phone. | Campaigns | **Simulated**: parsing strings and selectors come from documentation and invented fixtures; the scraper has never been run against real Vietnamese Google Maps. A real-run verification needs a live campaign on a few Vietnamese cities, then a hand check that cards are found and that name, rating, review count, category, address, phone and website match what Maps shows (and that the Indonesian parsing, which moved from the page to Node, is unchanged on a real run) |
+| **Vietnamese regions** | A lead's province, regency and district come from the geocoder for `vn` addresses, matched against the 34 provincial units from Nghị quyết 202/2025/QH15 (with the pre-merger names mapped to the current unit). | Leads, Pipeline | **Simulated**: the list was read from two government-portal and press summaries because the Gazette could not be fetched, and the way OpenStreetMap names provinces was not verified. Re-check against the Gazette |
+| **Landline guard** | Approving a WhatsApp draft for a landline or service number answers 400 "Not a mobile number" (the whole approval is refused); the sender checks again before the provider is called and marks the message failed. Scoring gives no phone points to such numbers; the template panel and lead detail say why. The check applies to WhatsApp only. | Outbox, Lead detail | **Verified** (unit tests; API tests and a pipeline check with a fake WhatsApp provider; no real send) |
+| **Time zone suggestion** | The Outbox overview and the email overview return `suggestedTimezone` from the latest campaign's market (`Asia/Ho_Chi_Minh` for `VN`, `Asia/Jakarta` otherwise); the WhatsApp panel uses it only for an untouched account. A notice appears when a Vietnam campaign exists and the country code is `62`. | Outbox | **Verified by unit tests** (the values come from the API; the panels were not checked in a browser) |
+| **Map centre** | The leads map opens on Ho Chi Minh City when no lead has coordinates and the latest campaign is `VN`, else Jakarta. | Leads | **Verified** (helper tests) |
+| **Per-market fixtures** | `SCRAPER_MODE=fixture` returns labelled stand-in leads for tests: Vietnamese ones carry province "Hồ Chí Minh", coordinates in Ho Chi Minh City and alternate landline and mobile numbers; Indonesian output is unchanged. | Tests | **Verified** (unit and end-to-end tests); never produced outside fixture mode |
+| **Vietnam compliance notice** | The campaign form shows a non-blocking line for `VN` naming Decree 91/2020/ND-CP and Decree 13/2023/ND-CP as rules that may apply, with the advice to review them with a legal adviser. It is risk information and never says the outreach is lawful. | New campaign | Decree numbers checked online (not whether they were amended later); **needs owner or legal sign-off** |
+
+**Known limitations**
+
+- Vietnamese Maps wording and selectors: Simulated (see above). Province list: re-check against the Gazette. The 30 Vietnamese cities need owner review. The compliance wording needs sign-off.
+- Indonesian card parsing moved from the browser page into Node; unit-tested, not re-verified against a real Indonesian run.
+- `normalizePhone(raw, '84')` stays generic; only `normalizePhoneFor` applies Vietnamese rules. `regionFromNominatim` is unchanged; `regionFromAddress` is new.
+- The WhatsApp panel suggests the time zone only for untouched accounts. Bulk approval fails as a whole when one draft is a landline. The same number in two markets is not separated (first lead wins). The template panel lists only Google Maps leads.
+- Not built: Vietnamese contact-page keywords for website enrichment, a Zalo channel.
+
 ## Safety built in
 
 - **Human approval** before every message.

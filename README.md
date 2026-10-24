@@ -31,7 +31,7 @@ If Prospex is useful to you, a star helps other people find it.
 | Step | What happens |
 |------|--------------|
 | **Understand your offer** | Give Prospex a website, a document (PDF, DOCX, Markdown, text) or pasted text. It reads the whole site (sitemap, `llms.txt`, linked pages), writes a Marketing Brief from what it finds, and fills in your campaign form for you to correct. What the sources do not say is listed as missing, not invented. |
-| **Find** | Scrape Google Maps by business type and city with a headless browser, up to 2,000 leads per campaign. A typed city is searched where you asked (anchored on its coordinates, results outside about 50 km are dropped); "Seluruh Indonesia" becomes one search per city, biggest markets first, 40 or more results per search. Each lead carries the real Maps category, rating, review count, phone, website and coordinates. If scraping fails the campaign fails honestly: Prospex never makes up businesses. |
+| **Find** | Scrape Google Maps by business type and city with a headless browser, up to 2,000 leads per campaign. A typed city is searched where you asked (anchored on its coordinates, results outside about 50 km are dropped); "Seluruh Indonesia" becomes one search per city, biggest markets first, 40 or more results per search. Each lead carries the real Maps category, rating, review count, phone, website and coordinates. If scraping fails the campaign fails honestly: Prospex never makes up businesses. Each campaign has a market, Indonesia or Vietnam, see [Markets](#markets). |
 | **Score** | A 0 to 100 ranking from signals in the listing (reachable by phone, rating weighted by review count, review volume) plus an AI judgement of how well the business fits your offer, with the reason shown. No hard-coded industry or city weights. |
 | **Draft** | The AI writes the first message from the lead's real data, your own style, the matching angle from your brief and your knowledge base. WhatsApp messages say who you are and what you offer in the first sentence, in plain words, then one relevant point and one easy question. Emails open with a greeting, end with a closing line ("Trân trọng," in Vietnamese, "Best regards," in English) and can carry one link you set yourself. Each campaign writes in one output language, Vietnamese (the default) or English, see [Language](#language). Three openings rotate across a campaign so you can compare reply rates. |
 | **One message for many leads** | Prefer to write it once? In the Outbox, pick a kind of business (for example every kebaya rental), choose the leads, write the message or let the AI write one for that kind of business, and Prospex makes one draft per lead in the review list. `{nama}` and `{kategori}` fill in each lead's own name and category. No AI call per lead, so hundreds of drafts take a second. |
@@ -137,10 +137,59 @@ Indonesian is no longer an interface or output language. If you upgrade an exist
 
 - Native-speaker review is pending for the interface text, the opt-out line, the email footer, the unsubscribe pages, the canned replies and the AI prompt wording (the list is in [docs/i18n-vi-glossary.md](docs/i18n-vi-glossary.md)).
 - Vietnamese AI output and Vietnamese WhatsApp export parsing were tested with invented fixtures and fake AI clients only ("Simulated" in [docs/features.md](docs/features.md)).
-- The rest of the product is still tuned for the Indonesian market and was left out of this change: the default phone country code is `62`, the area lookup and the Google Maps scraper (Indonesian locale and `hl=id`, searches suffixed with ", Indonesia", city lists, "Seluruh Indonesia") are Indonesian, and billing amounts are shown with "Rp". Prospex does not yet discover Vietnamese-market leads on its own.
+- Lead discovery for Vietnam is covered by the per-campaign market, see [Markets](#markets) and its own known limitations. Two defaults still follow the Indonesian market: the default phone country code of a WhatsApp account is `62` (leads of a Vietnam campaign use `84` regardless; the code applies to numbers you type yourself), and billing amounts are shown with "Rp".
 - `message_opt_outs.reason` stores the first 200 characters of the customer's own opt-out message, as before.
 - WhatsApp attachments received from customers are stored with Indonesian-looking markers such as `[Gambar]` or `[Kontak: ...]` and shown as stored, also in the Vietnamese interface.
 - The screenshots in `docs/screenshots` still show the English interface.
+
+<a id="markets"></a>
+## Markets
+
+A campaign sells in one market: **Indonesia (`ID`)** or **Vietnam (`VN`)**. The market is chosen in *New campaign, Market* (the interface language only suggests a starting value: Vietnamese interface starts on Vietnam, English on Indonesia; you can change it). Over the API the field is `market`, `"ID"` or `"VN"`; leaving it out gives `ID`.
+
+What the market changes:
+
+| Part | Indonesia (`ID`) | Vietnam (`VN`) |
+|------|------------------|----------------|
+| Google Maps search | `hl=id`, browser locale `id-ID`, time zone `Asia/Jakarta`, areas suffixed ", Indonesia" | `hl=vi`, `vi-VN`, `Asia/Ho_Chi_Minh`, areas suffixed ", Việt Nam" |
+| Whole-country search | "Seluruh Indonesia" and similar words: one search per city, 70 cities | "toàn quốc", "cả nước", "Việt Nam" and similar: one search per city, 30 cities |
+| Place names | The existing Indonesian city and alias lists | Vietnamese aliases ("TP.HCM", "Sài Gòn" and similar resolve to one place), prefixes such as "thành phố", "tỉnh" |
+| Phone numbers | Unchanged (`62`) | Country code `84`: `090…`, `+84 90…`, `84 90…` and a bare nine-digit mobile all become `849…` |
+| WhatsApp reachability | No rule | Landline (`02x…`) and service (`1800`/`1900`) numbers are recognised and cannot be messaged |
+| Regions of a lead | As before | Province from the geocoder, matched against the 34 provincial units |
+| Leads map | Opens on Jakarta | Opens on Ho Chi Minh City when no lead has coordinates and the latest campaign is Vietnam |
+| Outbox time zone | `Asia/Jakarta` | A new, untouched account starts on `Asia/Ho_Chi_Minh` when the latest campaign is Vietnam |
+
+Lead scoring gives no phone points to a landline or service number (text "Landline: cannot be reached on WhatsApp"). The market belongs to the campaign; a lead's market is its campaign's market, so every lead, referral and backfill uses the right rules.
+
+**Rules to know**
+
+- `market` other than `"ID"` or `"VN"`, and `null` or `""`, answer `400` ("market must be one of: ID, VN").
+- `PATCH /api/campaigns/:id` may change `market` only while the campaign is a draft, otherwise `409`. A campaign outside your workspace is `404`.
+- `POST /api/scraper/campaigns/:id/start` answers `409` unless the campaign is a draft or has failed. **A completed campaign can no longer be re-run: create a new one.**
+- Approving a WhatsApp draft for a landline or service number answers `400` "Not a mobile number" and the whole approval is refused (the batch stays as drafts). The sender checks again just before sending and marks the message failed with the same text; the provider is never called.
+- **Compliance is risk information, not a claim.** For Vietnam the campaign form shows: "Vietnamese rules on unsolicited commercial messages (Decree 91/2020/ND-CP) and on personal data (Decree 13/2023/ND-CP) may apply to this outreach. This is risk information to review with a legal adviser, not legal advice." (Vietnamese: the same text under `camp.market.compliance`.) Prospex does not decide whether your outreach is lawful. The wording needs sign-off from the owner or a legal adviser.
+
+### Upgrade notes (adding the market)
+
+1. **Run the migration.** `20261024000000_campaign_market` adds `campaigns.market` as `TEXT NOT NULL DEFAULT 'ID'`; it is additive, every existing campaign reads `ID` and nothing is rewritten. Apply it with `pnpm --filter @prospex/database db:deploy` (production and CI), or `pnpm --filter @prospex/database db:push` in a development database. The reverse SQL is a comment in the migration file (`ALTER TABLE "campaigns" DROP COLUMN "market";`).
+2. **Existing Indonesian behaviour is pinned** by regression tests written before the change (phone, WhatsApp text, area planning, Maps parsing, geocoder regions, scoring); the Indonesian outputs are expected to be unchanged.
+3. **Re-running completed campaigns is no longer possible** (see above); scripts that restarted a `completed` campaign now get `409`.
+4. API clients that send `market` must send exactly `"ID"` or `"VN"`.
+
+### Known limitations of the market support
+
+- **Vietnamese Google Maps wording is Simulated.** The labels, selectors and card formats used for Vietnamese pages came from documentation and invented fixtures; the scraper has never been run against real Vietnamese Maps. A real run is needed to confirm that cards are found, and that ratings, review counts, phone and address are read correctly. Check the first results by hand.
+- The province list (Simulated; 34 units from Nghị quyết 202/2025/QH15) was read from two summaries because the Gazette could not be fetched; re-check it against the Gazette. How OpenStreetMap names old and new provinces is not verified.
+- The 30 Vietnamese cities used for "toàn quốc" need owner review.
+- The compliance wording needs owner or legal sign-off.
+- Indonesian Maps card parsing moved from the browser page into Node (`parseCard`). It is unit-tested (including an Indonesian card), but it was not re-verified against a real Indonesian run.
+- `normalizePhone(raw, '84')` stays generic; only `normalizePhoneFor(raw, market)` applies the Vietnamese rules. `regionFromNominatim` is unchanged; the new `regionFromAddress` dispatches by country.
+- The WhatsApp panel suggests the time zone only for an untouched account (no paired phone, time zone still `Asia/Jakarta`).
+- Bulk approval fails as a whole when one draft in it is a landline or service number.
+- Vietnamese contact-page keywords for website enrichment were not added. There is no Zalo channel.
+- The same phone number in two markets is not separated: a referral for a number that already belongs to a lead in the workspace is not added again, and the first lead with that number wins.
+- The Outbox template panel lists only leads that come from Google Maps.
 
 ## Tech stack
 
