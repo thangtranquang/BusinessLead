@@ -198,6 +198,7 @@ export class LeadsService {
     address?: string;
     lat?: number;
     lng?: number;
+    province?: string;
     phone?: string;
     website?: string;
     rating?: string;

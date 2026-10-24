@@ -141,3 +141,63 @@ test("start is refused with 409 unless the campaign is a draft or failed, and no
     assert.equal(spent.length, 0);
   }
 });
+
+// Fixture leads per market (TC-VM-8.1 to 8.5). Simulated: invented names and visibly fake numbers, only under SCRAPER_MODE=fixture.
+test("fixture mode VN: invented Vietnamese leads with Ho Chi Minh City region, coordinates and fake numbers (TC-VM-8.3, 8.5)", async () => {
+  process.env.SCRAPER_MODE = "fixture";
+  try {
+    const f = fakes("VN", async () => assert.fail("the browser must not be used in fixture mode"));
+    await f.processor.process(job({ maxResults: 4 }));
+    assert.equal(f.calls.length, 0);
+    const leads = f.created[0] as Array<Record<string, unknown>>;
+    assert.ok(leads.length > 0 && leads.length <= 10);
+    assert.deepEqual(leads.map((l) => l.name), leads.map((_, i) => `Công ty Mẫu ${i + 1}`));
+    for (const l of leads) {
+      assert.equal(l.province, "Hồ Chí Minh");
+      assert.equal(l.lat, 10.7769);
+      assert.equal(l.lng, 106.7009);
+      assert.equal(l.source, "fixture");
+      assert.equal(l.website, "");
+      assert.match(String(l.phone), /^(028 0000 \d{4}|0900 000 \d{3})$/);
+    }
+    assert.ok(leads.some((l) => String(l.phone).startsWith("028")), "a landline is present");
+    assert.ok(leads.some((l) => String(l.phone).startsWith("0900")), "a mobile is present");
+  } finally {
+    delete process.env.SCRAPER_MODE;
+  }
+});
+
+test("fixture mode ID: output is exactly what it was before the Vietnam work, with no region keys (TC-VM-8.4)", async () => {
+  process.env.SCRAPER_MODE = "fixture";
+  try {
+    for (const stored of ["ID", undefined]) {
+      const f = fakes(stored, async () => []);
+      await f.processor.process(job({ searchQueries: ["kopi"], location: "Bandung", maxResults: 3 }));
+      const leads = f.created[0] as Array<Record<string, unknown>>;
+      assert.equal(leads.length, 3);
+      assert.deepEqual(leads[0], {
+        name: "[Test data] kopi Bandung 1",
+        address: "Bandung",
+        phone: "",
+        website: "",
+        rating: "3.5",
+        reviewCount: 5,
+        hasWebsite: false,
+        referenceUrl: "",
+        source: "fixture",
+        lat: undefined,
+        lng: undefined,
+        score: 10,
+        priority: "LOW",
+        category: undefined,
+        aiAnalysis: { factors: [], recommendation: "" },
+        marketingContent: null,
+        campaignId: "c1",
+        workspaceId: "w1",
+      });
+      assert.ok(!("province" in leads[0]));
+    }
+  } finally {
+    delete process.env.SCRAPER_MODE;
+  }
+});

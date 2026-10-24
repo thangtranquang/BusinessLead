@@ -380,6 +380,69 @@ async function main() {
   check("'Đúng, gửi giúp em báo giá' is not an opt-out", !(await prisma.messageOptOut.findUnique({ where: { workspaceId_phone: { workspaceId: ws, phone: "629900000033" } } })) && (await prisma.lead.findUniqueOrThrow({ where: { id: viKeep.id } })).crmStatus !== "lost");
   await prisma.outboundMessage.updateMany({ where: { workspaceId: ws, status: { in: ["draft", "approved"] } }, data: { status: "cancelled" } });
 
+  // 11. Vietnam market: phones normalise to 84, landlines are refused at approve and at send, the timezone follows the latest campaign
+  const vnCampaign = await prisma.campaign.create({ data: { name: "check-vn", industry: "x", location: "TP.HCM", searchQueries: ["x"], yourService: "x", market: "VN", language: "vietnamese", workspaceId: ws } });
+  const vnRows = [
+    { name: "Mau Di Dong 1", phone: "0900 000 001" },
+    { name: "Mau Ban 1", phone: "028 0000 0001" },
+    { name: "Mau Quoc Te", phone: "+84 90 000 0002" },
+    { name: "Mau Ban Bi Chan", phone: "028 0000 0004" },
+    { name: "Mau Tong Dai", phone: "1900 1234" },
+  ].map((r) => ({ ...r, campaignId: vnCampaign.id, workspaceId: ws }));
+  await leadsSvc.createMany(vnRows, "VN");
+  const vnLead = async (name: string) => prisma.lead.findFirstOrThrow({ where: { workspaceId: ws, campaignId: vnCampaign.id, name } });
+  const mobile = await vnLead("Mau Di Dong 1");
+  const landline = await vnLead("Mau Ban 1");
+  const intl = await vnLead("Mau Quoc Te");
+  const blocked = await vnLead("Mau Ban Bi Chan");
+  check("VN: createMany normalises mobile, international and landline shapes to 84...", mobile.phoneE164 === "84900000001" && intl.phoneE164 === "84900000002" && landline.phoneE164 === "842800000001");
+  check("VN: a 1900 service number is stored without a WhatsApp number", (await vnLead("Mau Tong Dai")).phoneE164 === null);
+  const kinds = [(await leadsSvc.findOne(mobile.id, ws)).phoneKind, (await leadsSvc.findOne(landline.id, ws)).phoneKind];
+  check("VN: the lead API classifies mobile and landline", kinds[0] === "mobile" && kinds[1] === "landline", kinds.join("/"));
+
+  const waCalls = { n: 0 };
+  const realResolve = wa.resolve.bind(wa);
+  const realSend = wa.send.bind(wa);
+  wa.resolve = async (w: string, phone: string) => { waCalls.n++; return realResolve(w, phone); };
+  wa.send = async (...args: Parameters<typeof wa.send>) => { waCalls.n++; return realSend(...args); };
+  const draftFor = (leadId: string, phone: string) => prisma.outboundMessage.create({ data: { workspaceId: ws, leadId, toPhone: phone, body: "Xin chào, đây là tin nhắn mẫu", source: "ai_outreach", status: "draft" } });
+
+  const landlineDraft = await draftFor(landline.id, "842800000001");
+  const mobileDraft = await draftFor(mobile.id, "84900000001");
+  const approveErr = await messaging.approve(ws, [landlineDraft.id, mobileDraft.id]).then(() => null, (e: Error & { status?: number }) => e);
+  check("VN: approving a landline draft is refused with 400 'Not a mobile number'", !!approveErr && (approveErr as { status?: number }).status === 400 && /Not a mobile number/.test(approveErr.message), approveErr?.message ?? "no error");
+  check("VN: ...and the whole batch stays draft", (await prisma.outboundMessage.count({ where: { id: { in: [landlineDraft.id, mobileDraft.id] }, status: "draft" } })) === 2);
+  check("VN: a mobile draft alone is approved", (await messaging.approve(ws, [mobileDraft.id])).approved === 1);
+  await prisma.outboundMessage.update({ where: { id: mobileDraft.id }, data: { status: "cancelled" } });
+
+  await prisma.outboundMessage.update({ where: { id: landlineDraft.id }, data: { status: "approved", approvedAt: new Date() } });
+  await prisma.whatsappAccount.update({ where: { workspaceId: ws }, data: { paused: false, nextSendAt: null, hourlyLimit: 30, quietStartHour: 0, quietEndHour: 0 } });
+  wa.mode = "ok";
+  const sentBeforeVn = wa.sent.length;
+  await sender.tick(ws);
+  const landlineOut = await prisma.outboundMessage.findUniqueOrThrow({ where: { id: landlineDraft.id } });
+  check("VN: the sender fails a landline lead with 'Not a mobile number'", landlineOut.status === "failed" && landlineOut.error === "Not a mobile number", `status=${landlineOut.status} error=${landlineOut.error}`);
+  check("VN: ...and the WhatsApp provider is never called", waCalls.n === 0 && wa.sent.length === sentBeforeVn);
+
+  await prisma.messageOptOut.create({ data: { workspaceId: ws, phone: "842800000004", reason: STOP_REASON } });
+  const optedDraft = await draftFor(blocked.id, "842800000004");
+  const optedApprove = await messaging.approve(ws, [optedDraft.id]).then((r) => r, () => null);
+  check("VN: an opted-out landline is refused by the opt-out check at approve, not sent", !!optedApprove && optedApprove.approved === 0 && (await prisma.outboundMessage.findUniqueOrThrow({ where: { id: optedDraft.id } })).status === "draft");
+  await prisma.outboundMessage.update({ where: { id: optedDraft.id }, data: { status: "approved", approvedAt: new Date() } });
+  await prisma.whatsappAccount.update({ where: { workspaceId: ws }, data: { nextSendAt: null } });
+  await sender.tick(ws);
+  const optedOut = await prisma.outboundMessage.findUniqueOrThrow({ where: { id: optedDraft.id } });
+  check("VN: an approved opted-out landline is cancelled by the opt-out, before the landline rule", optedOut.status === "cancelled" && optedOut.error === "Recipient opted out" && waCalls.n === 0, `status=${optedOut.status} error=${optedOut.error}`);
+
+  const vnOverview = await messaging.overview(ws);
+  check("VN: the outbox suggests Asia/Ho_Chi_Minh when the latest campaign is Vietnamese", vnOverview.suggestedTimezone === "Asia/Ho_Chi_Minh" && vnOverview.hasVnCampaign === true, String(vnOverview.suggestedTimezone));
+  await sleep(20); // a later createdAt than the Vietnamese campaign
+  await prisma.campaign.create({ data: { name: "check-id-later", industry: "x", location: "Bandung", searchQueries: ["x"], yourService: "x", workspaceId: ws } });
+  const idOverview = await messaging.overview(ws);
+  check("ID: the suggestion follows the latest campaign back to Asia/Jakarta", idOverview.suggestedTimezone === "Asia/Jakarta" && idOverview.hasVnCampaign === true, String(idOverview.suggestedTimezone));
+  wa.resolve = realResolve;
+  wa.send = realSend;
+
   await sleep(1000); // reply drafts for the inbound messages above are written a moment later; let them finish before the workspace goes
 
   // cleanup: deleting the workspace removes everything this run created

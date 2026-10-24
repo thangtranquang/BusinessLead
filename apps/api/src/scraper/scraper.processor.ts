@@ -126,6 +126,7 @@ export class ScraperProcessor extends WorkerHost {
             source: (lead as { source?: string }).source ?? "google_maps",
             lat: lead.lat ?? undefined,
             lng: lead.lng ?? undefined,
+            ...((lead as { province?: string }).province ? { province: (lead as { province?: string }).province } : {}),
             score: lead.score,
             priority: lead.priority,
             category: (lead as { category?: string }).category || undefined,
@@ -193,7 +194,7 @@ export class ScraperProcessor extends WorkerHost {
         break;
       }
       if (fixtures) {
-        results.push(...this.fixtureLeads(data, combo.query, combo.area, perQuery));
+        results.push(...this.fixtureLeads(data, combo.query, combo.area, perQuery, market));
       } else {
         try {
           const raw = await this.googleMaps.scrape(combo.query, perQuery, { area: combo.area, market });
@@ -265,11 +266,32 @@ export class ScraperProcessor extends WorkerHost {
   }
 
   /**
-   * Only for tests and demos (SCRAPER_MODE=fixture). Clearly labelled, with no phone number, no website and
-   * source "fixture", so they can never be mistaken for real businesses or be contacted.
+   * Only for tests and demos (SCRAPER_MODE=fixture). Clearly labelled and source "fixture", so they can never be mistaken
+   * for real businesses. Indonesia: no phone, no website, no coordinates. Vietnam: invented "Công ty Mẫu" names with
+   * visibly fake numbers (alternating landline and mobile), Ho Chi Minh City coordinates and province, so region filters and the
+   * landline guard can be exercised without the geocoder.
    */
-  private fixtureLeads(data: ScraperJobData, query: string, area: string, count: number) {
-    return Array.from({ length: Math.min(count, 10) }, (_, i) => ({
+  private fixtureLeads(data: ScraperJobData, query: string, area: string, count: number, market: Market = "ID") {
+    const n = Math.min(count, 10);
+    if (market === "VN") {
+      return Array.from({ length: n }, (_, i) => ({
+        name: `Công ty Mẫu ${i + 1}`,
+        address: `${area}`,
+        phone: i % 2 === 0 ? `028 0000 ${String(i + 1).padStart(4, "0")}` : `0900 000 ${String(i + 1).padStart(3, "0")}`,
+        website: "",
+        rating: (3.5 + (i % 3) * 0.4).toFixed(1),
+        reviewCount: 5 + i * 17,
+        category: "",
+        hasWebsite: false,
+        referenceUrl: "",
+        lat: 10.7769,
+        lng: 106.7009,
+        province: "Hồ Chí Minh",
+        industry: data.industry,
+        source: "fixture",
+      }));
+    }
+    return Array.from({ length: n }, (_, i) => ({
       name: `[Test data] ${query} ${i + 1}`,
       address: `${area}`,
       phone: "",
