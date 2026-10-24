@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AttachmentService } from "./attachment.service";
 import { decide, nextGapMs, startOfLocalDay, typingDelayMs } from "./send-policy";
 import { ProviderUnavailableError, WHATSAPP_PROVIDER, type RoutedWhatsappProvider, type SendExtras } from "./whatsapp.provider";
+import { isNotMobile, NOT_MOBILE } from "./messaging.service";
 import { EntitlementsService } from "../entitlements/entitlements.service";
 
 const TICK_MS = 15_000;
@@ -95,6 +96,14 @@ export class SenderService implements OnModuleInit, OnModuleDestroy {
       if (optedOut) {
         await this.prisma.outboundMessage.update({ where: { id: next.id }, data: { status: "cancelled", error: "Recipient opted out" } });
         return;
+      }
+      // Landline and 1800/1900 numbers cannot receive WhatsApp: fail here, after the claim and the opt-out check, before the provider is touched.
+      if (next.leadId) {
+        const lead = await this.prisma.lead.findFirst({ where: { id: next.leadId, workspaceId: a.workspaceId }, select: { phoneE164: true, campaign: { select: { market: true } } } });
+        if (isNotMobile(lead?.phoneE164, lead?.campaign?.market) || isNotMobile(next.toPhone, lead?.campaign?.market)) {
+          await this.prisma.outboundMessage.update({ where: { id: next.id }, data: { status: "failed", error: NOT_MOBILE } });
+          return;
+        }
       }
       const jid = await this.wa.resolve(a.workspaceId, next.toPhone);
       if (!jid) {

@@ -133,8 +133,11 @@ function SettingsDialog({ open, onClose, overview, refresh }: { open: boolean; o
   // an API that predates the editions work does not send these fields; treat that as "not available"
   const cloudApi = overview.cloudApi ?? { entitled: false, installed: false, edition: "community" as const };
   const [provider, setProvider] = useState<"baileys" | "cloud_api">(overview.provider ?? "baileys");
-  const [v, setV] = useState({ hourlyLimit: a.hourlyLimit, dailyLimit: a.dailyLimit, quietStartHour: a.quietStartHour, quietEndHour: a.quietEndHour, timezone: a.timezone, defaultCountryCode: a.defaultCountryCode });
-  useEffect(() => { if (open) setProvider(overview.provider ?? "baileys"); if (open) setV({ hourlyLimit: a.hourlyLimit, dailyLimit: a.dailyLimit, quietStartHour: a.quietStartHour, quietEndHour: a.quietEndHour, timezone: a.timezone, defaultCountryCode: a.defaultCountryCode }); }, [open, a]);
+  // An account that was never configured (never paired, still on the default zone) starts from the market's zone; a saved or paired account is shown as it is.
+  const untouched = !a.phone && a.timezone === "Asia/Jakarta" && !!overview.suggestedTimezone;
+  const startTz = untouched ? overview.suggestedTimezone! : a.timezone;
+  const [v, setV] = useState({ hourlyLimit: a.hourlyLimit, dailyLimit: a.dailyLimit, quietStartHour: a.quietStartHour, quietEndHour: a.quietEndHour, timezone: startTz, defaultCountryCode: a.defaultCountryCode });
+  useEffect(() => { if (open) setProvider(overview.provider ?? "baileys"); if (open) setV({ hourlyLimit: a.hourlyLimit, dailyLimit: a.dailyLimit, quietStartHour: a.quietStartHour, quietEndHour: a.quietEndHour, timezone: startTz, defaultCountryCode: a.defaultCountryCode }); }, [open, a, startTz]);
 
   const num = (k: "hourlyLimit" | "dailyLimit" | "quietStartHour" | "quietEndHour", label: string, min: number, max: number) => (
     <div className="space-y-1.5">
@@ -179,6 +182,7 @@ function SettingsDialog({ open, onClose, overview, refresh }: { open: boolean; o
           </div>
         </div>
         <p className="text-xs text-muted-foreground">{t("outbox.set.hint")}</p>
+        {overview.hasVnCampaign && a.defaultCountryCode === "62" && <p className="text-xs text-muted-foreground">{t("outbox.set.ccNotice")}</p>}
         <div className="flex justify-end"><Button onClick={save}>{t("outbox.set.save")}</Button></div>
       </DialogContent>
     </Dialog>

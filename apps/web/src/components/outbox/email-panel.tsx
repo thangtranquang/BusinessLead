@@ -89,7 +89,7 @@ const EMPTY = { host: "", port: 587, secure: false, username: "", password: "", 
 function AccountDialog({ open, onClose, overview, refresh }: { open: boolean; onClose: () => void; overview: EmailOverview; refresh: () => void }) {
   const { t } = useI18n();
   const a = overview.account;
-  const initial = a ? { ...accountBody(a), replyTo: a.replyTo ?? "", password: "" } : EMPTY;
+  const initial = a ? { ...accountBody(a), replyTo: a.replyTo ?? "", password: "" } : { ...EMPTY, timezone: overview.suggestedTimezone ?? EMPTY.timezone };
   const [v, setV] = useState<typeof EMPTY>(initial as typeof EMPTY);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open) setV(initial as typeof EMPTY); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps

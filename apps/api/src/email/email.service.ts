@@ -10,6 +10,7 @@ import { createTransport, friendlySmtpError } from "./email-transport";
 import { fitAllowed, fitLevel } from "../messaging/fit-gate";
 import { headerLine, isPublicUnsubscribeBase, unsubscribeBase } from "./email-utils";
 import { DEFAULT_OUTPUT_LANGUAGE, toOutputLanguage } from "../common/language";
+import { initialTimezone } from "../common/market";
 
 export const MAX_GENERATE = 200;
 
@@ -46,6 +47,7 @@ export class EmailService {
     const a = await this.prisma.emailAccount.findUnique({ where: { workspaceId } });
     const now = new Date();
     const tz = a?.timezone ?? "Asia/Jakarta";
+    const latestCampaign = await this.prisma.campaign.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { market: true } });
     const base = { workspaceId, channel: "email" };
     const [sentLastHour, sentToday, drafts, approved, withEmail] = await Promise.all([
       this.prisma.outboundMessage.count({ where: { ...base, status: "sent", sentAt: { gte: new Date(now.getTime() - 3_600_000) } } }),
@@ -55,6 +57,8 @@ export class EmailService {
       this.prisma.lead.count({ where: { workspaceId, email: { not: null }, source: "google_maps", outbound: { none: { channel: "email", source: "ai_outreach", status: { notIn: ["rejected", "cancelled"] } } } } }),
     ]);
     return {
+      /** Time zone a new account starts with: the market of the latest campaign (Jakarta when there is none). */
+      suggestedTimezone: initialTimezone(latestCampaign?.market),
       account: a ? publicAccount(a) : null,
       usage: { sentLastHour, sentToday, drafts, approved, leadsWithEmail: withEmail },
       unsubscribeReady: isPublicUnsubscribeBase(unsubscribeBase({ PUBLIC_API_URL: this.config.get<string>("PUBLIC_API_URL"), PORT: this.config.get<string>("PORT") })),

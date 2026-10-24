@@ -1,6 +1,10 @@
 export type WaStatus = "disconnected" | "connecting" | "qr" | "connected" | "logged_out";
 
 export interface Overview {
+  /** Time zone a not yet configured account starts with: the market of the latest campaign. Absent on an API that predates it. */
+  suggestedTimezone?: string;
+  /** True when any campaign of the workspace sells in Vietnam. */
+  hasVnCampaign?: boolean;
   account: {
     status: WaStatus; phone: string | null; hourlyLimit: number; dailyLimit: number; quietStartHour: number; quietEndHour: number;
     timezone: string; defaultCountryCode: string; paused: boolean; lastError: string | null; nextSendAt: string | null;
@@ -33,6 +37,7 @@ export interface GenerationJob {
 export type Counts = Record<string, number>;
 
 export interface EmailOverview {
+  suggestedTimezone?: string;
   account: {
     host: string; port: number; secure: boolean; username: string; hasPassword: boolean; fromName: string; fromEmail: string; replyTo: string | null; postalAddress: string; ctaUrl: string | null;
     hourlyLimit: number; dailyLimit: number; quietStartHour: number; quietEndHour: number; timezone: string; paused: boolean;

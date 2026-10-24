@@ -6,7 +6,8 @@ import { CAPTION_LIMIT } from "./attachment-file";
 import { maybePreview, previewForText } from "./link-preview";
 import { MessageWriterService } from "./message-writer.service";
 import { isValidEmail } from "./email-address";
-import { normalizePhone } from "./phone";
+import { normalizePhone, normalizePhoneFor } from "./phone";
+import { classifyRawPhone, initialTimezone, normalizeMarket, phoneKind } from "../common/market";
 import { inQuietHours, localHour, startOfLocalDay } from "./send-policy";
 import { WHATSAPP_PROVIDER, type RoutedWhatsappProvider } from "./whatsapp.provider";
 import { EntitlementsService } from "../entitlements/entitlements.service";
@@ -22,6 +23,14 @@ const RAW_SUBJECT_CAP = 1000;
 
 export { isValidEmail };
 export const MAX_GENERATE = 200;
+/** Error text for a WhatsApp message to a landline or service number (VM-FR-25); the sender uses the same words. */
+export const NOT_MOBILE = "Not a mobile number";
+/** A WhatsApp message needs a mobile line: a Vietnamese landline or 1800/1900 number can never receive it. */
+export function isNotMobile(e164: string | null | undefined, market: unknown): boolean {
+  if (!e164) return false;
+  const kind = phoneKind(e164, normalizeMarket(market));
+  return kind === "landline" || kind === "service";
+}
 export const MAX_BULK = 200;
 
 export interface GenerationJob {
@@ -69,13 +78,19 @@ export class MessagingService {
     this.wa.use(workspaceId, account.provider);
     const live = this.wa.state(workspaceId);
     const now = new Date();
-    const [sentLastHour, sentToday, drafts, approved] = await Promise.all([
+    const [sentLastHour, sentToday, drafts, approved, latestCampaign, vnCampaigns] = await Promise.all([
       this.prisma.outboundMessage.count({ where: { workspaceId, channel: "whatsapp", status: "sent", source: { not: "external" }, sentAt: { gte: new Date(now.getTime() - 3_600_000) } } }),
       this.prisma.outboundMessage.count({ where: { workspaceId, channel: "whatsapp", status: "sent", source: { not: "external" }, sentAt: { gte: startOfLocalDay(now, account.timezone) } } }),
       this.prisma.outboundMessage.count({ where: { workspaceId, channel: "whatsapp", status: "draft" } }),
       this.prisma.outboundMessage.count({ where: { workspaceId, channel: "whatsapp", status: "approved" } }),
+      this.prisma.campaign.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { market: true } }),
+      this.prisma.campaign.count({ where: { workspaceId, market: "VN" } }),
     ]);
     return {
+      /** Time zone a not yet configured account should start with: the market of the latest campaign (Jakarta when there is none). */
+      suggestedTimezone: initialTimezone(latestCampaign?.market),
+      /** True when any campaign of this workspace sells in Vietnam (the panel warns about a leftover country code 62). */
+      hasVnCampaign: vnCampaigns > 0,
       account: {
         status: live.status !== "disconnected" ? live.status : account.status === "logged_out" ? "logged_out" : "disconnected",
         phone: live.phone ?? account.phone,
@@ -185,7 +200,7 @@ export class MessagingService {
       },
       orderBy: [{ score: "desc" }, { createdAt: "asc" }],
       take: limit * 3,
-      include: { campaign: { select: { yourService: true, language: true } } },
+      include: { campaign: { select: { yourService: true, language: true, market: true } } },
     });
     const optOuts = new Set((await this.prisma.messageOptOut.findMany({ where: { workspaceId }, select: { phone: true } })).map((o) => o.phone));
 
@@ -195,7 +210,7 @@ export class MessagingService {
     for (const lead of candidates) {
       if (plan.length >= limit) break;
       if (!fitAllowed(fitLevel(lead.aiAnalysis), !!input.includeMedium)) { job.skipped.lowFit++; continue; }
-      const phone = lead.phoneE164 || normalizePhone(lead.phone, account.defaultCountryCode);
+      const phone = lead.phoneE164 || normalizePhoneFor(lead.phone, normalizeMarket(lead.campaign?.market));
       if (!phone) { job.skipped.noValidPhone++; continue; }
       if (optOuts.has(phone)) { job.skipped.optedOut++; continue; }
       if (seen.has(phone) || (await this.hasActive(workspaceId, phone))) { job.skipped.duplicateNumber++; continue; }
@@ -240,6 +255,8 @@ export class MessagingService {
   /** A one-off message written by a person (a test, a quick note). It is a draft like any other and still needs approval. */
   async createManual(workspaceId: string, input: { phone: string; body: string; leadId?: string; attachmentId?: string; linkPreview?: boolean }) {
     const account = await this.account(workspaceId);
+    // a typed 1800/1900 number is not WhatsApp-capable; the rule is read from the Vietnamese rules only when the account sells with +84
+    if (account.defaultCountryCode === "84" && classifyRawPhone(input.phone, "VN") === "service") throw new BadRequestException("Service number: not WhatsApp-capable");
     const phone = normalizePhone(input.phone, account.defaultCountryCode);
     if (!phone) throw new BadRequestException("That phone number is not valid");
     const body = capThenNfc(input.body, RAW_BODY_CAP).trim(); // NFC first, then the length check
@@ -289,7 +306,7 @@ export class MessagingService {
 
   async approve(workspaceId: string, ids: string[]) {
     const account = await this.account(workspaceId);
-    const msgs = await this.prisma.outboundMessage.findMany({ where: { workspaceId, id: { in: ids.slice(0, MAX_BULK) }, status: "draft" } });
+    const msgs = await this.prisma.outboundMessage.findMany({ where: { workspaceId, id: { in: ids.slice(0, MAX_BULK) }, status: "draft" }, include: { lead: { select: { phoneE164: true, campaign: { select: { market: true } } } } } });
     const optOuts = new Set((await this.prisma.messageOptOut.findMany({ where: { workspaceId }, select: { phone: true } })).map((o) => o.phone));
     const mailOptOuts = new Set((await this.prisma.emailOptOut.findMany({ where: { workspaceId }, select: { email: true } })).map((o) => o.email));
     const mailAccount = msgs.some((m) => m.channel === "email") ? await this.prisma.emailAccount.findUnique({ where: { workspaceId } }) : null;
@@ -314,8 +331,13 @@ export class MessagingService {
       }
       if (!normalizePhone(m.toPhone, account.defaultCountryCode)) rejected.push({ id: m.id, reason: "invalid number" });
       else if (optOuts.has(m.toPhone)) rejected.push({ id: m.id, reason: "recipient opted out" });
-      else if (!text.trim() || text.length > MAX_BODY) rejected.push({ id: m.id, reason: "invalid text" });
-      else accept();
+      else {
+        // after the opt-out check (unchanged order); a throw happens before any write, so every draft of the batch stays a draft
+        const market = m.lead?.campaign?.market;
+        if (isNotMobile(m.lead?.phoneE164, market) || isNotMobile(m.toPhone, market)) throw new BadRequestException(NOT_MOBILE);
+        if (!text.trim() || text.length > MAX_BODY) rejected.push({ id: m.id, reason: "invalid text" });
+        else accept();
+      }
     }
     // the count of rows really moved (a draft approved or deleted by someone else in the meantime is not counted)
     const batch = ok.length ? await this.prisma.outboundMessage.updateMany({ where: { id: { in: ok }, workspaceId, status: "draft" }, data: { status: "approved", approvedAt: new Date(), error: null } }) : { count: 0 };
