@@ -1,3 +1,5 @@
+import { normalizeProvinceVN } from "./vn-provinces";
+
 /** Where a business is: province, kabupaten/kota and kecamatan, read from an OpenStreetMap (Nominatim) reverse-geocode answer. */
 export interface Region {
   province: string | null;
@@ -16,6 +18,8 @@ export interface NominatimAddress {
   district?: string;
   city_district?: string;
   suburb?: string;
+  quarter?: string;
+  village?: string;
   country_code?: string;
 }
 
@@ -29,6 +33,24 @@ export function normalizeProvince(name: string | null): string | null {
   return name.replace(/^provinsi\s+/i, "");
 }
 
+/** Vietnam (country_code "vn"). Simulated: field choice follows the PRD, not yet checked against the live Nominatim. */
+export function regionFromNominatimVN(a: NominatimAddress | undefined): Region | null {
+  if (!a || typeof a !== "object") return null;
+  const str = (v: unknown) => (typeof v === "string" ? clean(v) : null);
+  const province = normalizeProvinceVN(str(a.state));
+  const regency = str(a.city_district) ?? str(a.county);
+  const district = str(a.suburb) ?? str(a.quarter) ?? str(a.village);
+  if (!province && !regency && !district) return null;
+  return { province: province ? province.slice(0, 80) : null, regency, district };
+}
+
+/** The geocoder entry point: dispatches on country_code ("vn" -> Vietnam; "id" or missing -> regionFromNominatim; other -> null). */
+export function regionFromAddress(a: NominatimAddress | undefined): Region | null {
+  if (a && a.country_code === "vn") return regionFromNominatimVN(a);
+  return regionFromNominatim(a);
+}
+
+/** Indonesia's path, unchanged; the S1 snapshot pins that it rejects any other country (vn included). */
 export function regionFromNominatim(a: NominatimAddress | undefined): Region | null {
   if (!a || (a.country_code && a.country_code.toLowerCase() !== "id")) return null;
   const isJakarta = [a.state, a.province, a.city].some((v) => v && /jakarta/i.test(v));

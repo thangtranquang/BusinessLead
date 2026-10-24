@@ -1,10 +1,20 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
-import { cellKey, regionFromNominatim, type Region } from "./geo";
+import { cellKey, regionFromAddress, type Region } from "./geo";
 
 const GAP_MS = 1100; // the public Nominatim allows one request a second
 const BATCH = 300;
+
+/** Language asked of the geocoder: Vietnamese for a Vietnam campaign, Indonesian otherwise (unchanged). */
+export function geocoderLanguage(market: string | null | undefined): "vi" | "id" {
+  return market === "VN" ? "vi" : "id";
+}
+
+/** Cache key: the plain cell for Indonesia (unchanged), the cell plus language for Vietnam. */
+export function geocoderCacheKey(market: string | null | undefined, lat: number, lng: number): string {
+  return market === "VN" ? `${cellKey(lat, lng)}|vi` : cellKey(lat, lng);
+}
 
 /**
  * Fills province / kabupaten-kota / kecamatan for leads from their coordinates, in the background.
@@ -46,14 +56,15 @@ export class GeoService {
     for (let round = 0; round < 100; round++) {
       const rows = await this.prisma.lead.findMany({
         where: { workspaceId, geocodedAt: null, lat: { not: null }, lng: { not: null }, ...(skip.length ? { id: { notIn: skip } } : {}) },
-        select: { id: true, lat: true, lng: true },
+        select: { id: true, lat: true, lng: true, campaign: { select: { market: true } } },
         take: BATCH,
       });
       if (!rows.length) return;
-      const cells = new Map<string, { lat: number; lng: number; ids: string[] }>();
+      const cells = new Map<string, { lat: number; lng: number; ids: string[]; market: string }>();
       for (const r of rows) {
-        const key = cellKey(r.lat!, r.lng!);
-        const c = cells.get(key) ?? { lat: r.lat!, lng: r.lng!, ids: [] };
+        const market = r.campaign?.market === "VN" ? "VN" : "ID";
+        const key = geocoderCacheKey(market, r.lat!, r.lng!);
+        const c = cells.get(key) ?? { lat: r.lat!, lng: r.lng!, ids: [], market };
         c.ids.push(r.id);
         cells.set(key, c);
       }
@@ -62,7 +73,7 @@ export class GeoService {
         if (this.cache.has(key)) region = this.cache.get(key) ?? null;
         else {
           try {
-            region = await this.lookup(c.lat, c.lng);
+            region = await this.lookup(c.lat, c.lng, geocoderLanguage(c.market));
           } catch (e) {
             if ((e as Error).message === "rate-limited") throw e;
             skip.push(...c.ids); // network trouble: try again on the next run, not in this one
@@ -77,13 +88,13 @@ export class GeoService {
     }
   }
 
-  private async lookup(lat: number, lng: number): Promise<Region | null> {
+  private async lookup(lat: number, lng: number, language: "vi" | "id" = "id"): Promise<Region | null> {
     const base = (this.config.get<string>("GEOCODER_URL") || "https://nominatim.openstreetmap.org").replace(/\/+$/, "");
-    const url = `${base}/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1&accept-language=id`;
+    const url = `${base}/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1&accept-language=${language}`;
     const res = await fetch(url, { headers: { "User-Agent": this.config.get<string>("GEOCODER_USER_AGENT") || "Prospex/1.0 (self-hosted lead tool)" }, signal: AbortSignal.timeout(10_000) });
     if (res.status === 429 || res.status === 403) throw new Error("rate-limited");
     if (!res.ok) throw new Error(`geocoder answered ${res.status}`);
-    const body = (await res.json()) as { address?: Parameters<typeof regionFromNominatim>[0] };
-    return regionFromNominatim(body.address);
+    const body = (await res.json()) as { address?: Parameters<typeof regionFromAddress>[0] };
+    return regionFromAddress(body.address);
   }
 }

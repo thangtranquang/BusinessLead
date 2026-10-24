@@ -7,9 +7,10 @@ import "leaflet/dist/leaflet.css";
 import { Phone, Star, ChevronRight } from "lucide-react";
 import type { Lead, MapLead } from "@/hooks/use-leads";
 import { useI18n } from "@/lib/i18n";
+import { useCampaigns } from "@/hooks/use-campaigns";
+import { mapCenterFor } from "@/lib/map-centre";
 
-// Jakarta city center — used as the default view when no leads have coordinates yet.
-const DEFAULT_CENTER: [number, number] = [-6.2088, 106.8456];
+// Default view when no leads have coordinates yet: Jakarta, or Ho Chi Minh City when the latest campaign is Vietnamese (see lib/map-centre.ts).
 const DEFAULT_ZOOM = 11;
 
 const PRIORITY_COLOR: Record<Lead["priority"], string> = {
@@ -56,6 +57,7 @@ interface Props {
 
 export function LeadsMap({ leads }: Props) {
   const { t } = useI18n();
+  const { campaigns } = useCampaigns();
   const pinned = leads.filter(
     (l): l is MapLead & { lat: number; lng: number } =>
       typeof l.lat === "number" && typeof l.lng === "number",
@@ -64,6 +66,12 @@ export function LeadsMap({ leads }: Props) {
     () => pinned.map((l) => [l.lat, l.lng]),
     [pinned],
   );
+
+  const latest = campaigns.reduce<(typeof campaigns)[number] | null>(
+    (a, c) => (!a || Date.parse(c.createdAt) > Date.parse(a.createdAt) ? c : a),
+    null,
+  );
+  const defaultCenter = mapCenterFor(pinned.length > 0, latest?.market);
 
   if (leads.length > 0 && pinned.length === 0) {
     return (
@@ -84,7 +92,7 @@ export function LeadsMap({ leads }: Props) {
         .leaflet-popup-content-wrapper { border-radius: 0.75rem; }
       `}</style>
       <MapContainer
-        center={pinned[0] ? [pinned[0].lat, pinned[0].lng] : DEFAULT_CENTER}
+        center={pinned[0] ? [pinned[0].lat, pinned[0].lng] : defaultCenter}
         zoom={pinned.length ? undefined : DEFAULT_ZOOM}
         scrollWheelZoom
         className="h-full w-full"
