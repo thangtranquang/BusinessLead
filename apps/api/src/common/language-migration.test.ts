@@ -7,6 +7,8 @@ import path from "node:path";
 const PRISMA = path.resolve(__dirname, "../../../../packages/database/prisma");
 const MIGRATIONS = path.join(PRISMA, "migrations");
 const LAST_BEFORE = "20261014010000_message_attachments";
+// later features add their own migrations; this test only covers the language one (it is the only 20261023 migration)
+const NEXT_FEATURE = "20261024";
 
 const read = (...p: string[]) => readFileSync(path.join(...p), "utf8");
 const migrationDirs = () => readdirSync(MIGRATIONS, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
@@ -25,7 +27,7 @@ test("schema.prisma: Campaign.language and MarketingBrief.language default to vi
 });
 
 test("one new migration, later than message_attachments, containing only the two SET DEFAULT statements (TC-29.2, DT-22)", () => {
-  const added = migrationDirs().filter((d) => d > LAST_BEFORE);
+  const added = migrationDirs().filter((d) => d > LAST_BEFORE && d < NEXT_FEATURE);
   assert.equal(added.length, 1, `expected exactly one migration after ${LAST_BEFORE}, got ${added.join(", ")}`);
   assert.match(added[0], /^20261023\d{6}_[a-z0-9_]+$/);
   const sql = read(MIGRATIONS, added[0], "migration.sql");

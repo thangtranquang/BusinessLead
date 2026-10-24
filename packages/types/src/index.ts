@@ -1,3 +1,4 @@
+export type Market = "ID" | "VN";
 export type CampaignStatus = "draft" | "running" | "completed" | "failed" | "paused";
 export type LeadPriority = "HIGH" | "MEDIUM" | "LOW";
 export type CrmStatus = "new" | "contacted" | "replied" | "meeting" | "proposal" | "won" | "lost";

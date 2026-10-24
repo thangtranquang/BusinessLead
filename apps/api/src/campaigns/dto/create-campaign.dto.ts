@@ -1,6 +1,7 @@
 import { IsString, IsArray, IsOptional, IsInt, Min, Max, MaxLength, ArrayMaxSize } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { IsOutputLanguage, type OutputLanguage } from "../../common/language";
+import { IsMarket, type Market } from "../../common/market";
 
 export class CreateCampaignDto {
   @ApiProperty() @IsString() @MaxLength(160) name: string;
@@ -13,4 +14,6 @@ export class CreateCampaignDto {
   @ApiProperty({ default: "balanced" }) @IsOptional() @IsString() @MaxLength(30) contentStyle?: string;
   /** "vietnamese" | "english"; omitted means vietnamese. An explicit null or any other value is a 400 (FR-17). */
   @IsOutputLanguage() language?: OutputLanguage;
+  /** "ID" | "VN"; omitted means ID. An explicit null or any other value is a 400. Changeable only while the campaign is a draft. */
+  @IsMarket() market?: Market;
 }

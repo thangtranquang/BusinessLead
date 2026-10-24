@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { CampaignsController } from "./campaigns.controller";
 import { CampaignsService } from "./campaigns.service";
 import type { CreateCampaignDto } from "./dto/create-campaign.dto";
@@ -148,4 +148,83 @@ test("the controller passes the caller's workspace id to PATCH and DELETE (S3)",
   await controller.update("c-a", { name: "x" }, "ws-a");
   await controller.remove("c-a", "ws-a");
   assert.deepEqual(seen, [["update", "c-a", { name: "x" }, "ws-a"], ["remove", "c-a", "ws-a"]]);
+});
+
+// ---- Vietnam market support: TC-VM-1.23, 3.1, 3.4, 3.6, 3.8, 3.9, 3.14 ----
+
+const MSEED = (): Row[] => [
+  { id: "d-a", workspaceId: "ws-a", name: "Nháp", market: "ID", status: "draft", language: "vietnamese" },
+  { id: "r-a", workspaceId: "ws-a", name: "Đang chạy", market: "VN", status: "running", language: "vietnamese" },
+  { id: "x-b", workspaceId: "ws-b", name: "Của B", market: "ID", status: "completed", language: "vietnamese" },
+];
+
+test("create stores market, defaulting to ID (TC-VM-1.23)", async () => {
+  const prisma = fakePrisma([]);
+  const svc = new CampaignsService(prisma as never);
+  await svc.create({ ...CREATE }, "ws-a");
+  await svc.create({ ...CREATE, market: "VN" }, "ws-a");
+  await svc.create({ ...CREATE, market: "ID" }, "ws-a");
+  assert.deepEqual(prisma.calls.create.map((c) => (c as Row).market), ["ID", "VN", "ID"]);
+});
+
+test("a market that is not ID or VN never reaches the database, even if validation was skipped", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  for (const bad of ["vn", null, "", "XX", 5, ["VN"], {}]) {
+    await assert.rejects(svc.create({ ...CREATE, market: bad } as never, "ws-a"), BadRequestException, String(bad));
+    await assert.rejects(svc.update("d-a", { market: bad } as never, "ws-a"), BadRequestException, String(bad));
+  }
+  assert.equal(prisma.calls.create.length, 0);
+  assert.equal(prisma.calls.updateMany.length, 0);
+});
+
+test("PATCH market on a draft is one updateMany limited to draft status inside the workspace (TC-VM-3.1, 3.14)", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  const out = await svc.update("d-a", { market: "VN" }, "ws-a");
+  assert.deepEqual(prisma.calls.updateMany[0], { where: { id: "d-a", workspaceId: "ws-a", status: "draft" }, data: { market: "VN" } });
+  assert.equal(out.market, "VN");
+});
+
+test("PATCH market on a non-draft is a 409 whether or not the value changes (TC-VM-3.3, 3.4)", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  await assert.rejects(svc.update("r-a", { market: "ID" }, "ws-a"), ConflictException);
+  await assert.rejects(svc.update("r-a", { market: "VN" }, "ws-a"), ConflictException);
+  assert.equal(prisma.rows[1].market, "VN");
+});
+
+test("404 comes before 409: another workspace's non-draft campaign is a 404 (TC-VM-3.6)", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  await assert.rejects(svc.update("x-b", { market: "VN" }, "ws-a"), NotFoundException);
+  await assert.rejects(svc.update("does-not-exist", { market: "VN" }, "ws-a"), NotFoundException);
+  assert.equal(prisma.rows[2].market, "ID");
+  assert.equal(prisma.calls.updateMany.length, 0, "nothing is written for a campaign outside the workspace");
+});
+
+test("PATCH without market on a non-draft keeps working and adds no status filter (TC-VM-3.8)", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  await svc.update("r-a", { name: "Tên mới" }, "ws-a");
+  assert.equal(prisma.rows[1].name, "Tên mới");
+  assert.deepEqual(prisma.calls.updateMany[0].where, { id: "r-a", workspaceId: "ws-a" });
+  assert.ok(!("market" in prisma.calls.updateMany[0].data));
+});
+
+test("PATCH name + market on a non-draft is a 409 and nothing is applied (TC-VM-3.9)", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  await assert.rejects(svc.update("r-a", { name: "Tên mới", market: "ID" }, "ws-a"), ConflictException);
+  assert.equal(prisma.rows[1].name, "Đang chạy");
+  assert.equal(prisma.rows[1].market, "VN");
+});
+
+test("PATCH name + market on a draft applies both", async () => {
+  const prisma = fakePrisma(MSEED());
+  const svc = new CampaignsService(prisma as never);
+  await svc.update("d-a", { name: "Tên mới", market: "VN" }, "ws-a");
+  assert.equal(prisma.rows[0].name, "Tên mới");
+  assert.equal(prisma.rows[0].market, "VN");
+  assert.ok(prisma.calls.updateMany.every((c) => !("market" in c.data) || c.where.status === "draft"), "market is only ever written with the draft filter");
 });

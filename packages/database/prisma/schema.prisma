@@ -132,6 +132,7 @@ model Campaign {
   yourService   String
   contentStyle  String    @default("balanced")
   language      String    @default("vietnamese")
+  market        String    @default("ID")
   status        String    @default("draft")
   progress      Int       @default(0)
   error         String?

@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateCampaignDto } from "./dto/create-campaign.dto";
 import { UpdateCampaignDto } from "./dto/update-campaign.dto";
+import { DEFAULT_MARKET, MARKETS, type Market } from "../common/market";
 import { DEFAULT_OUTPUT_LANGUAGE, OUTPUT_LANGUAGES, type OutputLanguage } from "../common/language";
 
 const DEFAULT_WORKSPACE_ID = "default-workspace";
@@ -17,6 +18,13 @@ function writableLanguage(value: unknown): OutputLanguage | undefined {
   if (value === undefined) return undefined;
   if (!(OUTPUT_LANGUAGES as readonly unknown[]).includes(value)) throw new BadRequestException("language is not supported");
   return value as OutputLanguage;
+}
+
+/** Same check as the language one, where the value is written. Omitted means "not given". */
+function writableMarket(value: unknown): Market | undefined {
+  if (value === undefined) return undefined;
+  if (!(MARKETS as readonly unknown[]).includes(value)) throw new BadRequestException("market is not supported");
+  return value as Market;
 }
 
 @Injectable()
@@ -58,6 +66,7 @@ export class CampaignsService {
         maxResults: dto.maxResults ?? 20,
         contentStyle: dto.contentStyle ?? "balanced",
         language: writableLanguage(dto.language) ?? DEFAULT_OUTPUT_LANGUAGE,
+        market: writableMarket(dto.market) ?? DEFAULT_MARKET,
         workspaceId,
       },
     });
@@ -69,11 +78,23 @@ export class CampaignsService {
    */
   async update(id: string, dto: UpdateCampaignDto, workspaceId: string) {
     const language = writableLanguage(dto.language);
+    const market = writableMarket(dto.market);
     const data: Record<string, unknown> = {};
     for (const key of EDITABLE) if (dto[key] !== undefined) data[key] = dto[key];
     if (language !== undefined) data.language = language;
-    const { count } = await this.prisma.campaign.updateMany({ where: { id, workspaceId }, data });
-    if (count === 0) throw new NotFoundException(`Campaign ${id} not found`);
+    // 404 first: a campaign outside the workspace never reaches the 409 below, so its status is not revealed
+    const existing = await this.prisma.campaign.findFirst({ where: { id, workspaceId }, select: { id: true } });
+    if (!existing) throw new NotFoundException(`Campaign ${id} not found`);
+    if (market !== undefined) {
+      // The market is the one field with a status condition, and the condition is part of the write itself (no read-then-write).
+      // It runs before every other field, so a refused market change applies nothing.
+      const { count } = await this.prisma.campaign.updateMany({ where: { id, workspaceId, status: "draft" }, data: { market } });
+      if (count === 0) throw new ConflictException("The market can only be changed while the campaign is a draft");
+    }
+    if (Object.keys(data).length > 0) {
+      const { count } = await this.prisma.campaign.updateMany({ where: { id, workspaceId }, data });
+      if (count === 0) throw new NotFoundException(`Campaign ${id} not found`);
+    }
     return this.findOne(id, workspaceId);
   }
 

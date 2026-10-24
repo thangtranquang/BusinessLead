@@ -13,6 +13,7 @@ export interface Campaign {
   maxResults?: number;
   contentStyle: string;
   language: string;
+  market?: "ID" | "VN";
   status: "draft" | "running" | "completed" | "failed" | "paused";
   progress: number;
   totalLeads: number;
