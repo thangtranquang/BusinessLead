@@ -4,6 +4,7 @@
  * Both matter to the conversation, so they are read here instead of being dropped.
  */
 import { CONTACT_CARD_RE, WA_INBOUND_MARKERS } from "../common/conversation-markers";
+import type { Market } from "../common/market";
 import { nfc, sliceChars } from "../common/text";
 
 export interface WaMessageLike {
@@ -69,8 +70,8 @@ export function messageText(message: WaMessageLike | null | undefined, opts: { m
 
 export interface Referral { name: string | null; phone: string }
 
-/** The contacts someone passed us: shared cards ("[Kontak: Nama +62...]") and numbers written in the text. At most 5. */
-export function parseReferrals(input: string): Referral[] {
+/** The contacts someone passed us (`market` VN also reads Vietnamese numbers; the default keeps today's Indonesian matching): shared cards ("[Kontak: Nama +62...]") and numbers written in the text. At most 5. */
+export function parseReferrals(input: string, market: Market = "ID"): Referral[] {
   const text = nfc(input);
   const out: Referral[] = [];
   const seen = new Set<string>();
@@ -88,5 +89,7 @@ export function parseReferrals(input: string): Referral[] {
   }
   const outside = text.replace(CONTACT_CARD_RE, " ");
   for (const m of outside.slice(0, 4000).matchAll(/(?<![\d+])(\+?62|0)8[\d\s-]{7,13}\d/g)) add(null, m[0].trim());
+  // Vietnam: compact numbers (0901234567, +84901234567, 84901234567); the input is already cut to 4000 and the pattern is bounded
+  if (market === "VN") for (const m of outside.slice(0, 4000).matchAll(/(?<![\d+])(?:\+?84|0)[35789]\d{8}(?!\d)/g)) add(null, m[0]);
   return out;
 }

@@ -1,3 +1,5 @@
+import { vnDigits, type Market } from "../common/market";
+
 /**
  * Normalizes a phone number to digits only with country code (WhatsApp JID user part), e.g. "0812-3456-789" -> "628123456789".
  * Returns null when the result cannot be a valid international number.
@@ -17,6 +19,17 @@ export function normalizePhone(raw: string | null | undefined, defaultCountryCod
     digits = defaultCountryCode + digits;
   }
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
+}
+
+/**
+ * The phone normaliser for a campaign's market. Indonesia is exactly `normalizePhone(raw, "62")`. Vietnam rejects text longer
+ * than 64 characters before any pattern runs, then applies the Vietnamese rules of `vnDigits` (trunk zero, +84 / 0084 / 84,
+ * landlines, service numbers refused, other countries' numbers kept).
+ */
+export function normalizePhoneFor(raw: string | null | undefined, market: Market): string | null {
+  if (market !== "VN") return normalizePhone(raw, "62");
+  if (!raw || typeof raw !== "string" || raw.length > 64) return null;
+  return vnDigits(raw);
 }
 
 /** Extracts the number from a WhatsApp JID such as "628123456789:12@s.whatsapp.net". */

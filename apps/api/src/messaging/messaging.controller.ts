@@ -15,8 +15,8 @@ import { MAX_BODY, MAX_BULK, MAX_EMAIL_BODY, MAX_GENERATE, MessagingService } fr
 class IdsDto {
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(MAX_BULK) @IsString({ each: true }) ids!: string[];
 }
-class ManualDto {
-  @IsString() @MinLength(6) @MaxLength(32) phone!: string;
+export class ManualDto {
+  @IsString() @MinLength(6) @MaxLength(64) phone!: string;
   @IsString() @MinLength(1) @MaxLength(MAX_BODY) body!: string;
   @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsString() @MaxLength(64) attachmentId?: string;

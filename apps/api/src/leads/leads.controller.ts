@@ -9,9 +9,9 @@ import { IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import { JwtGuard } from "../auth/jwt.guard";
 import { WorkspaceId } from "../auth/current-workspace.decorator";
 
-class ReferralDto {
+export class ReferralDto {
   @IsOptional() @IsString() @MaxLength(160) name?: string;
-  @IsString() @MinLength(8) @MaxLength(40) phone!: string;
+  @IsString() @MinLength(8) @MaxLength(64) phone!: string;
 }
 
 @ApiTags("Leads")
