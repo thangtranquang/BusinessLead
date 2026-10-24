@@ -157,6 +157,7 @@ export function LeadDetail({ id }: { id: string }) {
             </CardHeader>
             <CardContent className="space-y-3">
               {lead.phoneKind === "landline" && <p className="text-xs text-warning">{t("leads.phone.landline")}</p>}
+              {lead.phoneKind === "service" && <p className="text-xs text-warning">{t("tpl.service")}</p>}
               {[
                 { icon: Phone, label: t("leads.detail.phone"), value: lead.phone },
                 { icon: Mail, label: t("leads.enrich.email"), value: lead.email ?? undefined },

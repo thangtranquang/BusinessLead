@@ -7,7 +7,7 @@ import { maybePreview, previewForText } from "./link-preview";
 import { MessageWriterService } from "./message-writer.service";
 import { isValidEmail } from "./email-address";
 import { normalizePhone, normalizePhoneFor } from "./phone";
-import { classifyRawPhone, initialTimezone, normalizeMarket, phoneKind } from "../common/market";
+import { classifyRawPhone, initialTimezone, isNotMobile, marketOfCallingCode, normalizeMarket, NOT_MOBILE } from "../common/market";
 import { inQuietHours, localHour, startOfLocalDay } from "./send-policy";
 import { WHATSAPP_PROVIDER, type RoutedWhatsappProvider } from "./whatsapp.provider";
 import { EntitlementsService } from "../entitlements/entitlements.service";
@@ -23,14 +23,6 @@ const RAW_SUBJECT_CAP = 1000;
 
 export { isValidEmail };
 export const MAX_GENERATE = 200;
-/** Error text for a WhatsApp message to a landline or service number (VM-FR-25); the sender uses the same words. */
-export const NOT_MOBILE = "Not a mobile number";
-/** A WhatsApp message needs a mobile line: a Vietnamese landline or 1800/1900 number can never receive it. */
-export function isNotMobile(e164: string | null | undefined, market: unknown): boolean {
-  if (!e164) return false;
-  const kind = phoneKind(e164, normalizeMarket(market));
-  return kind === "landline" || kind === "service";
-}
 export const MAX_BULK = 200;
 
 export interface GenerationJob {
@@ -210,8 +202,12 @@ export class MessagingService {
     for (const lead of candidates) {
       if (plan.length >= limit) break;
       if (!fitAllowed(fitLevel(lead.aiAnalysis), !!input.includeMedium)) { job.skipped.lowFit++; continue; }
-      const phone = lead.phoneE164 || normalizePhoneFor(lead.phone, normalizeMarket(lead.campaign?.market));
+      // Indonesia keeps its old rule exactly (the account's country code); only a Vietnam lead is read with the Vietnamese rules
+      const market = normalizeMarket(lead.campaign?.market);
+      const phone = lead.phoneE164 || (market === "VN" ? normalizePhoneFor(lead.phone, market) : normalizePhone(lead.phone, account.defaultCountryCode));
       if (!phone) { job.skipped.noValidPhone++; continue; }
+      // a landline or 1800/1900 number can never get a WhatsApp message: spend no draft on it (counted as noValidPhone)
+      if (isNotMobile(phone, market)) { job.skipped.noValidPhone++; continue; }
       if (optOuts.has(phone)) { job.skipped.optedOut++; continue; }
       if (seen.has(phone) || (await this.hasActive(workspaceId, phone))) { job.skipped.duplicateNumber++; continue; }
       seen.add(phone);
@@ -333,7 +329,8 @@ export class MessagingService {
       else if (optOuts.has(m.toPhone)) rejected.push({ id: m.id, reason: "recipient opted out" });
       else {
         // after the opt-out check (unchanged order); a throw happens before any write, so every draft of the batch stays a draft
-        const market = m.lead?.campaign?.market;
+        // a lead's number is read with its campaign's market; a free-typed number (no lead) with the account's calling code
+        const market = m.lead ? m.lead.campaign?.market : marketOfCallingCode(account.defaultCountryCode);
         if (isNotMobile(m.lead?.phoneE164, market) || isNotMobile(m.toPhone, market)) throw new BadRequestException(NOT_MOBILE);
         if (!text.trim() || text.length > MAX_BODY) rejected.push({ id: m.id, reason: "invalid text" });
         else accept();

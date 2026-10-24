@@ -47,14 +47,14 @@ export class EmailService {
     const a = await this.prisma.emailAccount.findUnique({ where: { workspaceId } });
     const now = new Date();
     const tz = a?.timezone ?? "Asia/Jakarta";
-    const latestCampaign = await this.prisma.campaign.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { market: true } });
     const base = { workspaceId, channel: "email" };
-    const [sentLastHour, sentToday, drafts, approved, withEmail] = await Promise.all([
+    const [sentLastHour, sentToday, drafts, approved, withEmail, latestCampaign] = await Promise.all([
       this.prisma.outboundMessage.count({ where: { ...base, status: "sent", sentAt: { gte: new Date(now.getTime() - 3_600_000) } } }),
       this.prisma.outboundMessage.count({ where: { ...base, status: "sent", sentAt: { gte: startOfLocalDay(now, tz) } } }),
       this.prisma.outboundMessage.count({ where: { ...base, status: "draft" } }),
       this.prisma.outboundMessage.count({ where: { ...base, status: "approved" } }),
       this.prisma.lead.count({ where: { workspaceId, email: { not: null }, source: "google_maps", outbound: { none: { channel: "email", source: "ai_outreach", status: { notIn: ["rejected", "cancelled"] } } } } }),
+      this.prisma.campaign.findFirst({ where: { workspaceId }, orderBy: { createdAt: "desc" }, select: { market: true } }),
     ]);
     return {
       /** Time zone a new account starts with: the market of the latest campaign (Jakarta when there is none). */

@@ -166,6 +166,21 @@ export function phoneKind(e164: string, market: Market): PhoneKind {
   return "unknown";
 }
 
+/** Error text for a WhatsApp message to a landline or service number (VM-FR-25); approve and the sender use the same words. */
+export const NOT_MOBILE = "Not a mobile number";
+
+/** A WhatsApp message needs a mobile line: a Vietnamese landline or 1800/1900 number can never receive it. */
+export function isNotMobile(e164: string | null | undefined, market: unknown): boolean {
+  if (!e164) return false;
+  const kind = phoneKind(e164, normalizeMarket(market));
+  return kind === "landline" || kind === "service";
+}
+
+/** The market of a number that belongs to no lead (typed by the owner): Vietnam when the account's calling code is 84. */
+export function marketOfCallingCode(code: string | null | undefined): Market {
+  return code === "84" ? "VN" : "ID";
+}
+
 /**
  * Classifies a phone as typed. "invalid" when it cannot be a number at all (empty, too long, too short). Under Vietnam a
  * 1800/1900 number is "service" even though no stored number may carry that kind (it normalises to null).
