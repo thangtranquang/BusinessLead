@@ -2,6 +2,10 @@
 
 ## 2026-10-26
 
+### Faster AI with Gemini — 09:15 UTC
+**Summary:** Writing drafts and judging leads with Gemini is about three times faster.
+**Details:** A workspace that uses Google Gemini now asks the model for little extra thinking. Measured on a real campaign: an AI call went from 15.7 s on average (up to 45 s) to 5.0 s (up to 6.5 s). Other providers are unchanged.
+
 ### Re-judge lead fit — 08:12 UTC
 **Summary:** Leads scanned before the AI key worked can now be scored again without scanning again.
 **Details:** New endpoint POST /api/leads/reassess/campaign/:campaignId judges fit again for leads without a verdict and updates score and priority. Up to 200 leads per call; call again for the rest.

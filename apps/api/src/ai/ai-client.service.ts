@@ -42,6 +42,18 @@ export interface StoredAiConfig {
   baseURL?: string;
 }
 
+/**
+ * Gemini 2.5 models "think" before they answer by default, which made every draft and fit batch take 15 to 45 seconds.
+ * A workspace pointed at Gemini asks for little thinking (the writing quality is the same for these short tasks).
+ */
+export function defaultReasoningEffort(baseURL: string | undefined): string | undefined {
+  try {
+    return baseURL && new URL(baseURL).hostname.toLowerCase() === "generativelanguage.googleapis.com" ? "low" : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const DEFAULT_WORKSPACE_CHAT_MODEL = "gpt-4o-mini";
 export const DEFAULT_WORKSPACE_EMBEDDING_MODEL = "text-embedding-3-small";
 
@@ -62,6 +74,7 @@ export function pickAiSettings(stored: StoredAiConfig | null, integrationEnabled
       baseURL: stored?.baseURL?.trim() || undefined,
       chatModel: stored?.model?.trim() || DEFAULT_WORKSPACE_CHAT_MODEL,
       embeddingModel: stored?.embeddingModel?.trim() || DEFAULT_WORKSPACE_EMBEDDING_MODEL,
+      reasoningEffort: defaultReasoningEffort(stored?.baseURL?.trim() || undefined),
     };
   }
   if (server.apiKey) {
