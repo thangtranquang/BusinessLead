@@ -53,6 +53,7 @@ export class GeoService {
 
   private async run(workspaceId: string) {
     const skip: string[] = [];
+    let failures = 0;
     for (let round = 0; round < 100; round++) {
       const rows = await this.prisma.lead.findMany({
         where: { workspaceId, geocodedAt: null, lat: { not: null }, lng: { not: null }, ...(skip.length ? { id: { notIn: skip } } : {}) },
@@ -77,8 +78,13 @@ export class GeoService {
           } catch (e) {
             if ((e as Error).message === "rate-limited") throw e;
             skip.push(...c.ids); // network trouble: try again on the next run, not in this one
+            // The public Nominatim cuts connections (ECONNRESET) once it throttles an address. Hammering it only makes that
+            // longer, and a silent run looks like "nothing happens": stop after a few failures in a row and say why.
+            failures++;
+            if (failures >= 3) throw new Error(`the geocoder keeps failing (${(e as Error).message}); point GEOCODER_URL at your own Nominatim or retry later`);
             continue;
           }
+          failures = 0;
           this.cache.set(key, region);
           if (this.cache.size > 5000) this.cache.delete(this.cache.keys().next().value as string);
           await new Promise((r) => setTimeout(r, GAP_MS));

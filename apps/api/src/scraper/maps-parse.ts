@@ -54,7 +54,9 @@ export function parseBareRating(raw: string | null | undefined): string {
 const NOT_CATEGORY = /^(\d[.,]\d|\(?\d[\d.,]*\)?$|buka|tutup|open|closed|opens|closes|sementara tutup|permanently|buka 24|24 jam|sponsor|iklan)/i;
 const ADDRESS_LIKE = /^(jl\.?|jalan|gg\.?|gang|street|st\.|rd\.|road|ruko|komplek|no\.?\s*\d)/i;
 // SIMULATED: Vietnamese interface wording, written from documentation, not checked against a real Vietnamese Maps page.
-const VN_NOT_CATEGORY = /^(mo cua|dong cua|tam thoi dong cua|dang mo cua|dang dong cua|quang cao|dia chi|dien thoai|trang web)(?![a-z])/;
+// Verified against a real hl=vi results page: the row before the info row can read "Chưa có bài đánh giá" (no reviews yet),
+// and a 24-hour place shows "Mở cả ngày". Neither is a category.
+const VN_NOT_CATEGORY = /^(mo cua|mo ca ngay|dong cua|tam thoi dong cua|dang mo cua|dang dong cua|quang cao|dia chi|dien thoai|trang web|chua co bai danh gia)(?![a-z])/;
 const VN_ADDRESS_LIKE = /^(?:(?:đường|phố|phường|quận|huyện|xã|ngõ|hẻm|kcn)(?![\p{L}\p{M}])|(?:số|tổ)\s{1,3}\d)/iu;
 
 /**
@@ -71,6 +73,27 @@ export function pickCategory(rows: string[], market: Market = "ID"): string {
     const first = t.split("·")[0].trim();
     if (!first || first.length > 60 || NOT_CATEGORY.test(first) || ADDRESS_LIKE.test(first) || /\d{3,}/.test(first) || skipVn(first)) continue;
     return first;
+  }
+  return "";
+}
+
+/**
+ * Vietnamese cards (verified on a real hl=vi page) show "Category · Address", and the address usually has NO street word
+ * ("· Điện Biên Phủ", "· 311 D5 Khu Xyz", a plus code), so words like "đường" cannot find it. The address is the second
+ * segment of the info row whose first segment is the category. Hours and phone segments are never an address.
+ */
+export function vnAddressFromRows(rows: string[], category: string): string {
+  if (!category) return "";
+  const cat = fold(clip(category, 80)).trim();
+  for (const row of rows) {
+    const segs = clip(nfc(row ?? ""), 200).split("·").map((s) => s.trim());
+    if (segs.length !== 2 || !segs[1]) continue;
+    if (fold(segs[0]).trim() !== cat) continue;
+    // Maps draws icons with private-use glyphs (seen as "" in a real answer): drop them, and ignore a segment that is only an icon
+    const addr = segs[1].replace(/\p{Co}/gu, "").trim();
+    if (!/[\p{L}\p{N}]/u.test(addr)) continue;
+    if (addr.length > 120 || VN_NOT_CATEGORY.test(fold(addr).trim()) || looksLikePhone(addr, "VN")) continue;
+    return addr;
   }
   return "";
 }
@@ -152,10 +175,15 @@ export function parseCard(raw: RawCard, market: Market = "ID"): ParsedCard {
       phone = t;
       continue;
     }
-    if (!address && looksLikeAddress(t, market)) address = t.replace(/^[·•–]\s*/, "").trim();
+    // ID keeps the street-word reading. VN takes the address from the info row below (a street word can match a name such
+    // as "thành phố" or "KCN"); a span is only a last resort and must START with the street word.
+    if (!address && !vn && looksLikeAddress(t, market)) address = t.replace(/^[·•–]\s*/, "").trim();
     if (reviewCount === null) reviewCount = parseReviewCount(t, market);
     if (vn && !rating) rating = parseBareRating(t);
   }
+
+  const category = pickCategory(raw.rows ?? [], market);
+  if (vn && !address) address = vnAddressFromRows(raw.rows ?? [], category);
 
   let website = "";
   let referenceLink = "";
@@ -171,7 +199,7 @@ export function parseCard(raw: RawCard, market: Market = "ID"): ParsedCard {
     website,
     rating: rating ? normalizeRating(rating, market) || "N/A" : "N/A",
     reviewCount,
-    category: pickCategory(raw.rows ?? [], market),
+    category,
     hasWebsite: !!website,
     referenceLink,
   };

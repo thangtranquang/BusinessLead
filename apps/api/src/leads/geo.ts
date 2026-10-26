@@ -33,11 +33,15 @@ export function normalizeProvince(name: string | null): string | null {
   return name.replace(/^provinsi\s+/i, "");
 }
 
-/** Vietnam (country_code "vn"). Simulated: field choice follows the PRD, not yet checked against the live Nominatim. */
+/**
+ * Vietnam (country_code "vn"). Checked against the live Nominatim for Ho Chi Minh City: the answer has NO `state` key;
+ * the province-level unit comes as `city` ("Thành phố Hồ Chí Minh") and the ward as `suburb`. So the province is
+ * `state`, else `province`, else `city`. Other regions of Vietnam are not yet checked against the live service.
+ */
 export function regionFromNominatimVN(a: NominatimAddress | undefined): Region | null {
   if (!a || typeof a !== "object") return null;
   const str = (v: unknown) => (typeof v === "string" ? clean(v) : null);
-  const province = normalizeProvinceVN(str(a.state));
+  const province = normalizeProvinceVN(str(a.state) ?? str(a.province) ?? str(a.city));
   const regency = str(a.city_district) ?? str(a.county);
   const district = str(a.suburb) ?? str(a.quarter) ?? str(a.village);
   if (!province && !regency && !district) return null;
