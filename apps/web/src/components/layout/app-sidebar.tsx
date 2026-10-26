@@ -7,7 +7,6 @@ import {
   LayoutDashboard, Megaphone, Users, BarChart3, Settings, Zap, LogOut, Sparkles, Send, ClipboardList, CreditCard, KanbanSquare, BookOpen,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -54,12 +53,9 @@ export function SidebarContent() {
     <div className="flex h-full w-full min-w-0 flex-col bg-sidebar">
       <div className="flex items-center gap-2 px-4 h-14 border-b border-sidebar-border">
         <div className="w-7 h-7 bg-gradient-brand rounded-lg flex items-center justify-center flex-shrink-0 shadow-glow">
-          <span className="text-white font-bold text-xs">P</span>
+          <span className="text-white font-bold text-xs">A</span>
         </div>
-        <span className="text-sidebar-foreground font-semibold">Prospex</span>
-        <Badge className="ml-auto text-[10px] py-0 px-1.5 bg-accent/20 text-accent border-0">
-          Beta
-        </Badge>
+        <span className="text-sidebar-foreground font-semibold">AICRM</span>
       </div>
 
       <div className="px-3 py-2 border-b border-sidebar-border">

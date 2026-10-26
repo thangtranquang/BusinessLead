@@ -16,9 +16,9 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center shadow-glow">
-              <span className="text-white font-bold text-sm">P</span>
+              <span className="text-white font-bold text-sm">A</span>
             </div>
-            <span className="text-white font-semibold text-xl">Prospex</span>
+            <span className="text-white font-semibold text-xl">AICRM</span>
           </div>
           <AuthHeading kind="login" />
         </div>
