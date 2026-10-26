@@ -50,6 +50,16 @@ test("a row with hours or a phone as its second segment is not an address", () =
   assert.equal(c.address, "");
 });
 
+test("a phone number glued to the end of the address (no hours row between them) is cut off", () => {
+  const a = parseCard(card({ rows: ["Dịch vụ vận chuyển hàng hóa · 151 Nguyễn Văn Thủ+84 28 0000 0007"], spans: ["+84 28 0000 0007"] }), "VN");
+  assert.equal(a.address, "151 Nguyễn Văn Thủ");
+  const b = parseCard(card({ rows: ["Công ty · 18A/92, Nguyễn Thị Minh Khai+84 900 000 008"], spans: [] }), "VN");
+  assert.equal(b.address, "18A/92, Nguyễn Thị Minh Khai");
+  // digits that belong to the address stay
+  const c = parseCard(card({ rows: ["Công ty · 100/10/13B Đường Nguyễn Thị Thảnh"], spans: [] }), "VN");
+  assert.equal(c.address, "100/10/13B Đường Nguyễn Thị Thảnh");
+});
+
 test("icon glyphs (private-use characters) are never an address", () => {
   const icon = String.fromCharCode(0xf54a);
   const only = parseCard(card({ rows: [`Công ty · ${icon}`], spans: [] }), "VN");

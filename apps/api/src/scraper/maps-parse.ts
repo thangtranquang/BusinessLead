@@ -90,7 +90,9 @@ export function vnAddressFromRows(rows: string[], category: string): string {
     if (segs.length !== 2 || !segs[1]) continue;
     if (fold(segs[0]).trim() !== cat) continue;
     // Maps draws icons with private-use glyphs (seen as "" in a real answer): drop them, and ignore a segment that is only an icon
-    const addr = segs[1].replace(/\p{Co}/gu, "").trim();
+    // With no hours row in between, the phone number is glued to the end of the address ("...Văn Thủ+84 28 ..."): cut it off.
+    // Bounded on purpose: a "+" followed by at most 20 phone characters at the very end.
+    const addr = segs[1].replace(/\p{Co}/gu, "").replace(/\+\d[\d\s().-]{6,20}$/u, "").trim();
     if (!/[\p{L}\p{N}]/u.test(addr)) continue;
     if (addr.length > 120 || VN_NOT_CATEGORY.test(fold(addr).trim()) || looksLikePhone(addr, "VN")) continue;
     return addr;
