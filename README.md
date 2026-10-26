@@ -179,7 +179,7 @@ Lead scoring gives no phone points to a landline or service number (text "Landli
 
 ### Known limitations of the market support
 
-- **Vietnamese Google Maps wording is Simulated.** The labels, selectors and card formats used for Vietnamese pages came from documentation and invented fixtures; the scraper has never been run against real Vietnamese Maps. A real run is needed to confirm that cards are found, and that ratings, review counts, phone and address are read correctly. Check the first results by hand.
+- **Vietnamese Google Maps parsing was verified on one real run only** (Ho Chi Minh City, seven business-type searches, 91 leads): cards, ratings, review counts, categories, phones and websites were read correctly, and the run exposed two address defects that are now fixed. Other cities, the end-of-list text and other result layouts are still unverified, and the Indonesian parsing has not been re-run against real Indonesian Maps. Check the first results of a new campaign by hand. Provinces come from OpenStreetMap's public Nominatim, which cuts connections once it throttles an address; the lookup now stops after three failures in a row and logs why (set `GEOCODER_URL` to your own Nominatim for large runs).
 - The province list (Simulated; 34 units from Nghị quyết 202/2025/QH15) was read from two summaries because the Gazette could not be fetched; re-check it against the Gazette. How OpenStreetMap names old and new provinces is not verified.
 - The 30 Vietnamese cities used for "toàn quốc" need owner review.
 - The compliance wording needs owner or legal sign-off.
