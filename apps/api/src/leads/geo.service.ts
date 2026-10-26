@@ -94,7 +94,26 @@ export class GeoService {
     }
   }
 
+  /**
+   * One lookup with up to 3 attempts. The public Nominatim cuts a connection now and then (ECONNRESET) and answers again a few
+   * seconds later, so a network error waits (GEOCODER_RETRY_MS, default 4000) and retries. "rate-limited" (429/403) is never retried.
+   */
   private async lookup(lat: number, lng: number, language: "vi" | "id" = "id"): Promise<Region | null> {
+    const pause = Number(this.config.get<string>("GEOCODER_RETRY_MS") ?? 4000);
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await this.lookupOnce(lat, lng, language);
+      } catch (e) {
+        if ((e as Error).message === "rate-limited") throw e;
+        lastError = e;
+        if (attempt < 3 && pause > 0) await new Promise((r) => setTimeout(r, pause));
+      }
+    }
+    throw lastError;
+  }
+
+  private async lookupOnce(lat: number, lng: number, language: "vi" | "id"): Promise<Region | null> {
     const base = (this.config.get<string>("GEOCODER_URL") || "https://nominatim.openstreetmap.org").replace(/\/+$/, "");
     const url = `${base}/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1&accept-language=${language}`;
     const res = await fetch(url, { headers: { "User-Agent": this.config.get<string>("GEOCODER_USER_AGENT") || "Prospex/1.0 (self-hosted lead tool)" }, signal: AbortSignal.timeout(10_000) });
