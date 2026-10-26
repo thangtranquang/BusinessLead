@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AICRM: kiến trúc và luồng xử lý</title>
+<style>
+:root{--bg:#fafaf7;--card:#fff;--text:#1f1f1c;--muted:#66655f;--line:#d9d7cd;--ai:#efecfc;--ai-b:#7f77dd;--sys:#f1efe8;--sys-b:#b4b2a9;--human:#e1f5ee;--human-b:#1d9e75;--store:#e6f1fb;--store-b:#378add;--ext:#faeeda;--ext-b:#ba7517}
+@media (prefers-color-scheme:dark){:root{--bg:#171715;--card:#201f1d;--text:#ecebe4;--muted:#a3a29a;--line:#3a3935;--ai:#2c2850;--ai-b:#7f77dd;--sys:#2a2926;--sys-b:#6b6a63;--human:#0f3a2e;--human-b:#1d9e75;--store:#12304d;--store-b:#378add;--ext:#40300f;--ext-b:#ba7517}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1040px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
+h2{font-size:19px;font-weight:600;margin:40px 0 6px}
+h3{font-size:16px;font-weight:600;margin:24px 0 8px}
+p.sub{color:var(--muted);margin:0 0 8px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:10px 0 18px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid}
+.ai{background:var(--ai);border-color:var(--ai-b)}.sys{background:var(--sys);border-color:var(--sys-b)}.human{background:var(--human);border-color:var(--human-b)}.store{background:var(--store);border-color:var(--store-b)}.ext{background:var(--ext);border-color:var(--ext-b)}
+.layer{border:1px dashed var(--line);border-radius:12px;padding:12px;margin:0 0 14px;background:var(--card)}
+.layer>.t{font-size:12px;color:var(--muted);text-transform:none;margin:0 0 8px}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.box{border:1px solid;border-radius:8px;padding:8px 12px;flex:1 1 150px;min-width:140px}
+.box b{display:block;font-weight:600}
+.box span{font-size:13px;color:var(--muted)}
+.arrow{text-align:center;color:var(--muted);font-size:13px;margin:-4px 0 10px}
+.chain{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:10px 0 4px}
+.chain .box{flex:0 1 190px;min-width:150px}
+.chain .sep{align-self:center;color:var(--muted);font-size:18px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:var(--sys);padding:1px 5px;border-radius:4px}
+.box code{background:transparent;padding:0;display:block;margin-top:2px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:14px;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;background:var(--sys)}
+tr:last-child td{border-bottom:0}
+.note{border-left:3px solid var(--human-b);padding:6px 12px;margin:12px 0;color:var(--muted);font-size:14px}
+.rules li{margin:4px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>AICRM: kiến trúc và luồng xử lý</h1>
+<p class="sub">Nền tảng tìm khách hàng trên Google Maps, soạn tin bằng AI, người duyệt rồi gửi WhatsApp hoặc email. Tên hàm và đường dẫn lấy từ mã nguồn hiện tại (monorepo Turborepo + pnpm).</p>
+<div class="legend">
+<span><i class="ai"></i>Bước dùng AI</span><span><i class="human"></i>Con người quyết định</span><span><i class="sys"></i>Hệ thống</span><span><i class="store"></i>Kho dữ liệu</span><span><i class="ext"></i>Dịch vụ bên ngoài</span>
+</div>
+
+<h2>1. Sơ đồ kiến trúc</h2>
+<p class="sub">Tất cả dữ liệu thuộc về một workspace (một doanh nghiệp); một tài khoản có thể có nhiều workspace.</p>
+
+<div class="layer"><div class="t">Người dùng</div><div class="row">
+<div class="box human"><b>Trình duyệt</b><span>Chủ doanh nghiệp: tạo chiến dịch, duyệt tin, xem CRM</span></div>
+</div></div>
+<div class="arrow">HTTPS, JWT gắn workspace đang dùng</div>
+
+<div class="layer"><div class="t">Giao diện: <code>apps/web</code> (Next.js 16, App Router, cổng 3000)</div><div class="row">
+<div class="box sys"><b>Dashboard</b><span>Leads, Chiến dịch, Outbox, CRM, Settings</span></div>
+<div class="box sys"><b>i18n vi/en</b><span><code>lib/i18n</code>, cookie prospex_lang</span></div>
+<div class="box sys"><b>Trang marketing</b><span><code>apps/marketing</code>, cổng 3002</span></div>
+</div></div>
+<div class="arrow">REST <code>NEXT_PUBLIC_API_URL</code> (/api), Swagger tại /api/docs</div>
+
+<div class="layer"><div class="t">API: <code>apps/api</code> (NestJS 10, cổng 3001; Joi kiểm tra biến môi trường; ThrottlerGuard 60 lần/phút)</div>
+<div class="row">
+<div class="box sys"><b>auth, workspace</b><span>JwtGuard kiểm tra lại thành viên, ApiKeyGuard</span></div>
+<div class="box sys"><b>campaigns, scraper</b><span>Tạo chiến dịch, hàng đợi quét</span></div>
+<div class="box sys"><b>leads</b><span>Danh sách, tỉnh/thành, làm giàu, chấm lại</span></div>
+<div class="box ai"><b>ai, marketing</b><span>Brief, độ phù hợp, kiến thức, giọng văn</span></div>
+</div>
+<div class="row" style="margin-top:10px">
+<div class="box sys"><b>messaging</b><span>Outbox, gửi, nhận, nhắc lại</span></div>
+<div class="box sys"><b>email</b><span>SMTP, chân thư, hủy đăng ký</span></div>
+<div class="box sys"><b>entitlements</b><span>Giới hạn gói, nạp từ plugin riêng</span></div>
+<div class="box sys"><b>settings</b><span>Khóa AI, tích hợp (mã hóa AES-256-GCM)</span></div>
+</div></div>
+<div class="arrow">Prisma 6, BullMQ, HTTP</div>
+
+<div class="layer"><div class="t">Kho dữ liệu và hàng đợi</div><div class="row">
+<div class="box store"><b>PostgreSQL 16 + pgvector</b><span>Workspace, Campaign, Lead, OutboundMessage, InboundMessage, KnowledgeChunk, StyleExample, MessageOptOut, UsageEvent</span></div>
+<div class="box store"><b>Redis 7</b><span>Hàng đợi BullMQ <code>scraper</code>, lưu giới hạn tốc độ</span></div>
+</div></div>
+
+<div class="layer"><div class="t">Dịch vụ bên ngoài</div><div class="row">
+<div class="box ext"><b>Nhà cung cấp AI</b><span>OpenAI, Google Gemini, OpenRouter hoặc Ollama (chuẩn OpenAI). Mỗi workspace có khóa riêng, nếu không có thì dùng khóa trên máy chủ</span></div>
+<div class="box ext"><b>Google Maps</b><span>Playwright (trình duyệt tự động) qua SafeProxy</span></div>
+<div class="box ext"><b>Nominatim</b><span>Tìm tỉnh/thành từ tọa độ, 1 yêu cầu/giây</span></div>
+<div class="box ext"><b>WhatsApp (Baileys)</b><span>Thiết bị liên kết bằng QR; API chính thức chỉ có ở bản hosted</span></div>
+<div class="box ext"><b>SMTP</b><span>Gửi email, mỗi tin có List-Unsubscribe</span></div>
+</div></div>
+
+<h2>2. Logic theo hàm</h2>
+<p class="sub">Mỗi chuỗi dưới đây là đường đi thật của dữ liệu, từ API đến cơ sở dữ liệu.</p>
+
+<h3>2.1 Brief tiếp thị</h3>
+<div class="chain">
+<div class="box human"><b>Nhập nguồn</b><code>BriefService.addUrl / addText / addFile</code></div><span class="sep">→</span>
+<div class="box sys"><b>Đọc website</b><code>readSite, url-fetch.ts</code><span>Chỉ qua url-fetch (chống SSRF)</span></div><span class="sep">→</span>
+<div class="box ai"><b>AI viết brief</b><code>BriefService.generate</code><span>Nhiều lượt: định vị, bằng chứng, tiếp cận</span></div><span class="sep">→</span>
+<div class="box sys"><b>Gỡ nội dung không có nguồn</b><code>groundBrief</code></div><span class="sep">→</span>
+<div class="box human"><b>Chủ duyệt, lưu</b><code>BriefService.save</code></div>
+</div>
+
+<h3>2.2 Chiến dịch → quét → lead</h3>
+<div class="chain">
+<div class="box human"><b>Tạo chiến dịch</b><code>CampaignsService.create</code><span>market ID hoặc VN</span></div><span class="sep">→</span>
+<div class="box sys"><b>Bắt đầu quét</b><code>ScraperController.startCampaign</code><span>Chỉ từ draft hoặc failed</span></div><span class="sep">→</span>
+<div class="box sys"><b>Đưa vào hàng đợi</b><code>BullMQ queue scraper</code></div><span class="sep">→</span>
+<div class="box sys"><b>Worker</b><code>ScraperProcessor.process</code></div>
+</div>
+<div class="chain">
+<div class="box sys"><b>Quét Maps</b><code>GoogleMapsScraperService.scrape</code><span>Đọc thẻ kết quả, phân tích bằng <code>maps-parse.ts</code></span></div><span class="sep">→</span>
+<div class="box ai"><b>Độ phù hợp</b><code>FitService.assess</code><span>20 lead mỗi lô, tối đa 200</span></div><span class="sep">→</span>
+<div class="box sys"><b>Chấm điểm</b><code>LeadIntelligenceService.scoreLeads</code><span>Luật: SĐT, đánh giá, review, độ phù hợp</span></div><span class="sep">→</span>
+<div class="box sys"><b>Lưu</b><code>LeadsService.createMany</code></div>
+</div>
+<div class="chain">
+<div class="box sys"><b>Tỉnh/thành (nền)</b><code>GeoService.start → run → lookup</code><span>Thử lại 3 lần, dừng khi bị giới hạn</span></div>
+<div class="box sys"><b>Đọc website lead</b><code>EnrichmentService.enrichCampaign</code><span>Email, WhatsApp, mạng xã hội</span></div>
+<div class="box ai"><b>Chấm lại độ phù hợp</b><code>ReassessService.reassessCampaign</code><span>Cho lead chưa có kết quả (khóa AI sai lúc quét)</span></div>
+</div>
+
+<h3>2.3 Soạn nháp → duyệt → gửi</h3>
+<div class="chain">
+<div class="box sys"><b>Chọn lead</b><code>MessagingService.startGeneration</code><span>Cần số di động hợp lệ, độ phù hợp đủ, chưa từ chối</span></div><span class="sep">→</span>
+<div class="box ai"><b>Soạn nháp</b><code>runGeneration → MessageWriterService.outreach</code><span>Kiến thức, giọng văn, brief</span></div><span class="sep">→</span>
+<div class="box sys"><b>Lưu nháp</b><code>OutboundMessage status draft</code><span>Gắn cờ rủi ro: <code>draftRisks</code></span></div>
+</div>
+<div class="chain">
+<div class="box human"><b>Người duyệt</b><code>MessagingService.approve</code><span>Kiểm tra từ chối, số bàn, bắt buộc</span></div><span class="sep">→</span>
+<div class="box sys"><b>Nhận phần việc</b><code>SenderService.tick</code><span>updateMany approved → sending</span></div><span class="sep">→</span>
+<div class="box sys"><b>Chính sách gửi</b><code>messaging/send-policy.ts</code><span>Giờ yên lặng, tốc độ, kiểm tra từ chối lần hai</span></div><span class="sep">→</span>
+<div class="box ext"><b>Gửi</b><code>WhatsappGateway → WhatsappProvider</code><span>Hoặc email qua SMTP</span></div>
+</div>
+
+<h3>2.4 Khách trả lời → CRM</h3>
+<div class="chain">
+<div class="box ext"><b>Tin đến</b><code>InboundService.handle</code><span>Chỉ lưu số thuộc về lead</span></div><span class="sep">→</span>
+<div class="box ai"><b>Phân loại ý định</b><code>reply-intent.ts, reply-plan.ts</code><span>Quan tâm, hỏi, để sau, từ chối, sai số</span></div><span class="sep">→</span>
+<div class="box ai"><b>Nháp trả lời</b><code>InboundService.draftReply → MessageWriterService.reply</code></div><span class="sep">→</span>
+<div class="box human"><b>Người duyệt</b><code>MessagingService.approve</code></div>
+</div>
+<div class="chain">
+<div class="box sys"><b>Tin của chủ</b><code>InboundService.handleOwnMessage</code><span>Chỉ ghi nhận cho số của lead</span></div>
+<div class="box sys"><b>Nhắc lại</b><code>FollowupService.run</code><span>Nháp nhắc, vẫn phải duyệt</span></div>
+<div class="box sys"><b>CRM</b><code>LeadsController PATCH :id/crm</code><span>new, contacted, replied, interested, meeting, proposal, won hoặc lost</span></div>
+</div>
+
+<h2>3. Dữ liệu chính</h2>
+<table>
+<tr><th>Bảng</th><th>Vai trò</th></tr>
+<tr><td><code>Workspace</code>, <code>WorkspaceMember</code></td><td>Một doanh nghiệp; mọi bảng dưới đây đều có <code>workspaceId</code></td></tr>
+<tr><td><code>Campaign</code></td><td>Dịch vụ, ngôn ngữ, thị trường (ID hoặc VN), trạng thái quét và tiến độ</td></tr>
+<tr><td><code>Lead</code></td><td>Thông tin Maps, điểm, mức ưu tiên, kết quả độ phù hợp (<code>aiAnalysis</code>), làm giàu, trạng thái CRM</td></tr>
+<tr><td><code>OutboundMessage</code> / <code>InboundMessage</code></td><td>Mọi tin đi và đến; kênh whatsapp hoặc email; trạng thái draft → approved → sending → sent</td></tr>
+<tr><td><code>MessageOptOut</code>, <code>EmailOptOut</code></td><td>Danh sách từ chối, kiểm tra lúc soạn, lúc duyệt và lúc gửi</td></tr>
+<tr><td><code>KnowledgeChunk</code>, <code>StyleExample</code></td><td>Vector pgvector cho kiến thức và ví dụ giọng văn; chỉ so sánh cùng mô hình embedding</td></tr>
+<tr><td><code>Integration</code></td><td>Khóa AI riêng của workspace, mã hóa bằng ENCRYPTION_KEY</td></tr>
+<tr><td><code>UsageEvent</code></td><td>Mỗi lần gọi AI: mô hình, token, độ trễ</td></tr>
+</table>
+
+<h2>4. Quy tắc bất biến</h2>
+<ul class="rules">
+<li>Không tin nào được gửi nếu chưa qua <code>MessagingService.approve</code>.</li>
+<li>Người gửi nhận phần việc bằng một lệnh <code>updateMany</code> nguyên tử; tin còn ở trạng thái sending sau khi khởi động lại bị đánh dấu lỗi, không bao giờ gửi lại.</li>
+<li>Danh sách từ chối được kiểm tra khi soạn, khi duyệt và khi gửi.</li>
+<li>Số điện thoại bàn hoặc đầu số dịch vụ (1800/1900) không bao giờ nhận tin WhatsApp.</li>
+<li>Mọi địa chỉ do người dùng nhập đều đi qua <code>url-fetch.ts</code> (chặn địa chỉ nội bộ); bộ phân tích chạy tuyến tính.</li>
+<li>Bộ quét không bao giờ bịa lead; dữ liệu giả chỉ dùng khi <code>SCRAPER_MODE=fixture</code>.</li>
+<li>Văn bản từ bên ngoài (danh sách Maps, tin khách, chat đã nhập) luôn nằm trong thẻ phân cách trong prompt.</li>
+<li>Khóa AI lưu mã hóa, không bao giờ gửi lại trình duyệt.</li>
+</ul>
+<div class="note">Gói, giá và thanh toán không nằm trong mã nguồn này; chúng được nạp từ plugin riêng qua <code>ALATPINTAR_CLOUD_PLUGIN</code>.</div>
+</main>
+</body>
+</html>
