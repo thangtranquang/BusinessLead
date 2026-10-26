@@ -33,6 +33,7 @@ table{border-collapse:collapse;width:100%;font-size:14px;background:var(--card);
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-weight:600;background:var(--sys)}
 tr:last-child td{border-bottom:0}
+@media(max-width:700px){table{display:block;overflow-x:auto}}
 .note{border-left:3px solid var(--human-b);padding:6px 12px;margin:12px 0;color:var(--muted);font-size:14px}
 .rules li{margin:4px 0}
 </style>
@@ -145,7 +146,75 @@ tr:last-child td{border-bottom:0}
 <div class="box sys"><b>CRM</b><code>LeadsController PATCH :id/crm</code><span>new, contacted, replied, interested, meeting, proposal, won hoặc lost</span></div>
 </div>
 
-<h2>3. Dữ liệu chính</h2>
+<h2>3. Use case người dùng</h2>
+<p class="sub">Tác nhân: <b>Chủ doanh nghiệp</b> (người dùng chính), <b>Khách hàng tiềm năng</b> (người nhận tin), <b>Quản trị tự lưu trữ</b> (người cài hệ thống), <b>Hệ thống</b> (bước tự động). Cột cuối ghi trường hợp rẽ nhánh hoặc lỗi.</p>
+
+<h3>A. Tài khoản và thiết lập</h3>
+<table>
+<tr><th>Mã</th><th>Use case</th><th>Các bước chính</th><th>Kết quả</th><th>Nhánh phụ và lỗi</th></tr>
+<tr><td>UC-01</td><td>Đăng ký, đăng nhập</td><td>Chủ mở trang đăng ký hoặc đăng nhập, nhập email và mật khẩu.</td><td>Nhận phiên làm việc gắn với một workspace.</td><td>Sai mật khẩu bị từ chối; phiên hết hạn thì quay lại đăng nhập.</td></tr>
+<tr><td>UC-02</td><td>Chuyển đổi workspace</td><td>Chủ có nhiều doanh nghiệp, chọn workspace khác; hệ thống kiểm tra thành viên rồi cấp token mới.</td><td>Toàn bộ dữ liệu tải lại cho doanh nghiệp được chọn.</td><td>Không phải thành viên thì bị từ chối; không còn dữ liệu của doanh nghiệp trước trong bộ nhớ.</td></tr>
+<tr><td>UC-03</td><td>Cấu hình AI</td><td>Settings → AI và khóa API: chọn nhà cung cấp (OpenAI, Gemini, OpenRouter, Ollama), dán khóa, lưu, bấm Kiểm tra kết nối.</td><td>Workspace dùng khóa riêng, mã hóa khi lưu; thông báo mô hình chat và embedding hoạt động.</td><td>Khóa kiểu Gemini nhưng URL gốc trống thì có cảnh báo; chưa có khóa riêng thì dùng khóa máy chủ; không có khóa nào thì tính năng AI từ chối chạy; chỉ chủ hoặc quản trị được đổi.</td></tr>
+<tr><td>UC-04</td><td>Đổi ngôn ngữ giao diện</td><td>Bấm EN hoặc VI trên thanh trên cùng.</td><td>Mọi màn hình đổi ngôn ngữ, ghi nhớ bằng cookie.</td><td>Giá trị cũ "indonesian" được đọc là tiếng Anh.</td></tr>
+<tr><td>UC-05</td><td>Kết nối WhatsApp</td><td>Outbox → Kết nối WhatsApp, quét mã QR bằng điện thoại.</td><td>Số được liên kết như một thiết bị; phiên giữ lại sau khi khởi động lại.</td><td>Chưa kết nối thì tin đã duyệt chờ trong hàng đợi; API chính thức chỉ có ở bản hosted.</td></tr>
+<tr><td>UC-06</td><td>Cấu hình email</td><td>Nhập tài khoản SMTP; địa chỉ đến từ bước làm giàu lead.</td><td>Kênh email dùng cùng luồng duyệt như WhatsApp.</td><td>Khi <code>PUBLIC_API_URL</code> không phải https công khai thì chặn gửi và từ chối duyệt email.</td></tr>
+<tr><td>UC-07</td><td>Đặt giới hạn gửi</td><td>Outbox → Giới hạn: số tin mỗi giờ và mỗi ngày, giờ yên lặng.</td><td>Hệ thống gửi chậm, ngẫu nhiên, trong giới hạn đã đặt.</td><td>Mặc định 10 mỗi giờ, 80 mỗi ngày, yên lặng 21:00 đến 07:00.</td></tr>
+<tr><td>UC-08</td><td>Tạo khóa API</td><td>Settings tạo khóa Prospex để gọi API từ công cụ ngoài.</td><td>Tích hợp bên ngoài truy cập REST theo workspace.</td><td></td></tr>
+</table>
+
+<h3>B. Hiểu doanh nghiệp của mình</h3>
+<table>
+<tr><th>Mã</th><th>Use case</th><th>Các bước chính</th><th>Kết quả</th><th>Nhánh phụ và lỗi</th></tr>
+<tr><td>UC-09</td><td>Thêm nguồn tài liệu</td><td>Trang Brief: nhập website, dán văn bản hoặc tải lên .pdf, .docx, .md, .txt.</td><td>Nguồn được đọc và lập chỉ mục cho cơ sở kiến thức.</td><td>Địa chỉ nội bộ hoặc không mở được bị chặn hoặc báo lỗi; website được đọc cả sơ đồ trang, không chỉ trang gõ vào.</td></tr>
+<tr><td>UC-10</td><td>Tạo và chỉnh brief tiếp thị</td><td>Bấm phân tích; hệ thống chạy nền nhiều lượt, trang hiện bước đang chạy; chủ sửa từng mục rồi lưu.</td><td>Brief có tóm tắt, đối tượng, bằng chứng, giọng văn, hướng tiếp cận; mỗi lần lưu là một phiên bản.</td><td>AI chưa cấu hình hoặc khóa sai thì báo lỗi; số liệu, khách hàng, giá không có trong nguồn bị loại và liệt kê là thiếu; JSON hỏng nhẹ được tự sửa.</td></tr>
+<tr><td>UC-11</td><td>Học giọng viết của chủ</td><td>Trang Style: nhập file chat WhatsApp đã xuất.</td><td>Hệ thống tính thống kê giọng văn và lưu các cặp hỏi đáp đã ẩn danh để bắt chước.</td><td>Không lưu chat thô; đổi mô hình embedding thì phải nhập lại.</td></tr>
+<tr><td>UC-12</td><td>Kiến thức để trả lời</td><td>Mọi nguồn tài liệu đều được lập chỉ mục; khi soạn trả lời, hệ thống lấy đoạn liên quan.</td><td>Bản nháp chỉ nêu điều có trong tài liệu.</td><td>Độ tin cậy thấp hoặc không có thì bản nháp không khẳng định; đổi mô hình embedding thì có nút lập chỉ mục lại.</td></tr>
+</table>
+
+<h3>C. Tìm khách hàng</h3>
+<table>
+<tr><th>Mã</th><th>Use case</th><th>Các bước chính</th><th>Kết quả</th><th>Nhánh phụ và lỗi</th></tr>
+<tr><td>UC-13</td><td>Tạo chiến dịch</td><td>Chiến dịch → Mới: chọn thị trường (Indonesia hoặc Việt Nam), loại doanh nghiệp cần tìm, khu vực, dịch vụ, ngôn ngữ; có thể tự điền từ brief.</td><td>Chiến dịch ở trạng thái nháp.</td><td>Trường đã sửa tay không bị ghi đè; chỉ đổi thị trường khi còn là nháp (nếu không thì 409).</td></tr>
+<tr><td>UC-14</td><td>Chạy chiến dịch</td><td>Bấm Bắt đầu; xem tiến độ.</td><td>Bộ quét tìm trên Google Maps, AI chấm độ phù hợp, hệ thống chấm điểm và lưu lead.</td><td>Chỉ bắt đầu từ nháp hoặc thất bại (nếu không thì 409); quét lỗi thì chiến dịch thất bại với thông báo rõ, không bịa lead; thiếu AI thì lead không có điểm phù hợp và có thể chấm lại sau.</td></tr>
+<tr><td>UC-15</td><td>Xem và lọc lead</td><td>Trang Leads: bảng hoặc bản đồ, lọc theo mức ưu tiên, trạng thái, tỉnh/thành, tìm theo tên, địa chỉ, số điện thoại.</td><td>Danh sách lead của workspace.</td><td>Tỉnh/thành điền dần từ nền (Nominatim giới hạn tốc độ).</td></tr>
+<tr><td>UC-16</td><td>Làm giàu thông tin liên hệ</td><td>Bấm đọc website của một lead hoặc cả chiến dịch.</td><td>Thêm email, WhatsApp, mạng xã hội tìm được.</td><td>Tối đa 50 lead mỗi lần; website không mở được thì bỏ qua lead đó.</td></tr>
+<tr><td>UC-17</td><td>Chấm lại độ phù hợp</td><td>Gọi lại sau khi sửa khóa AI.</td><td>Lead chưa có kết quả được chấm lại, điểm và mức ưu tiên cập nhật.</td><td>Tối đa 200 lead mỗi lần; gọi lại cho phần còn lại.</td></tr>
+<tr><td>UC-18</td><td>Xuất dữ liệu</td><td>Chi tiết chiến dịch: xuất CSV, JSON hoặc vCard.</td><td>File lead để dùng nơi khác.</td><td></td></tr>
+</table>
+
+<h3>D. Nhắn tin có người duyệt</h3>
+<table>
+<tr><th>Mã</th><th>Use case</th><th>Các bước chính</th><th>Kết quả</th><th>Nhánh phụ và lỗi</th></tr>
+<tr><td>UC-19</td><td>Soạn nháp tin đầu tiên</td><td>Outbox: chọn chiến dịch, số lượng, có hoặc không gồm lead phù hợp mức vừa; bấm Soạn bản nháp.</td><td>Mỗi lead một bản nháp riêng trong Chờ duyệt.</td><td>Bỏ qua lead có số bàn hoặc không hợp lệ, đã từ chối, trùng số, độ phù hợp thấp; AI lỗi ba lần liên tiếp thì dừng; nháp có đường dẫn, giá, chiết khấu hoặc tên thương hiệu lạ bị gắn cờ rủi ro.</td></tr>
+<tr><td>UC-20</td><td>Một tin cho nhiều lead</td><td>Viết một tin hoặc để AI viết cho một loại doanh nghiệp, chọn nhiều lead.</td><td>Mỗi người có nháp riêng.</td><td>Đính kèm file (PDF, ảnh, video, tài liệu văn phòng) và thẻ xem trước đường dẫn; API chính thức từ chối file chứ không gửi riêng phần chữ.</td></tr>
+<tr><td>UC-21</td><td>Xem, sửa, duyệt hoặc từ chối nháp</td><td>Outbox → Chờ duyệt: đọc, sửa nội dung, duyệt hoặc từ chối.</td><td>Tin đã duyệt vào hàng đợi; tin bị từ chối không gửi.</td><td>Kiểm tra từ chối và số bàn lúc duyệt; email bị từ chối nếu thiếu địa chỉ công khai.</td></tr>
+<tr><td>UC-22</td><td>Gửi theo nhịp</td><td>Hệ thống nhận từng tin đã duyệt, kiểm tra chính sách rồi gửi.</td><td>Tin chuyển sang Đã gửi, lead sang "đã liên hệ".</td><td>Ngoài giờ hoặc quá hạn mức thì chờ; ba lần lỗi liên tiếp tạm dừng tài khoản; tin bị gián đoạn lúc gửi được đánh dấu lỗi, không bao giờ tự gửi lại; có nút thử lại thủ công.</td></tr>
+<tr><td>UC-23</td><td>Nhắc lại khi im lặng</td><td>Sau 3 và 5 ngày không phản hồi, hệ thống soạn nháp nhắc.</td><td>Tối đa hai nháp nhắc, vẫn cần duyệt.</td><td>Hủy khi lead đã trả lời hoặc từ chối.</td></tr>
+<tr><td>UC-24</td><td>Soạn tin thủ công</td><td>Nhập số điện thoại và nội dung.</td><td>Một bản nháp như mọi bản khác, vẫn cần duyệt.</td><td>Số dịch vụ 1800 hoặc 1900 bị từ chối; nội dung rỗng hoặc quá dài bị từ chối.</td></tr>
+</table>
+
+<h3>E. Khách hàng phản hồi và chốt</h3>
+<table>
+<tr><th>Mã</th><th>Use case</th><th>Các bước chính</th><th>Kết quả</th><th>Nhánh phụ và lỗi</th></tr>
+<tr><td>UC-25</td><td>Khách trả lời</td><td>Tin đến từ số của một lead; hệ thống phân loại ý định theo luật.</td><td>CRM cập nhật, các nháp nhắc bị hủy, sinh nháp trả lời lịch sự nếu cần.</td><td>Số lạ chỉ lưu, không trả lời; lời chào tự động của cửa hàng không sinh nháp; số bị ẩn (LID) hiện ở "Tin từ người gửi chưa rõ".</td></tr>
+<tr><td>UC-26</td><td>Duyệt trả lời</td><td>Chủ xem nháp trả lời, sửa, duyệt.</td><td>Tin trả lời gửi ngay ở lượt kế tiếp, trước tin chào hàng, ngoài giới hạn giờ và hạn mức.</td><td>Nếu chủ đã tự trả lời trên điện thoại thì không soạn thêm; nháp cũ bị thay bởi nháp mới.</td></tr>
+<tr><td>UC-27</td><td>Khách yêu cầu dừng</td><td>Khách trả lời STOP hoặc tương đương (tiếng Việt, Anh, Indonesia).</td><td>Số vào danh sách từ chối vĩnh viễn, tin chờ bị hủy, lead đóng là thua.</td><td>Hệ thống chặn lại ở lúc soạn, lúc duyệt và lúc gửi; email có đường dẫn hủy đăng ký, truy cập GET không đổi trạng thái.</td></tr>
+<tr><td>UC-28</td><td>Chủ nhắn từ điện thoại</td><td>Chủ tự gõ cho lead trên WhatsApp.</td><td>Tin được ghi vào cuộc trò chuyện để AI đọc đủ hai phía.</td><td>Chỉ ghi cho số thuộc về lead.</td></tr>
+<tr><td>UC-29</td><td>Quản lý pipeline đến chốt</td><td>Trang Pipeline và chi tiết lead: đổi trạng thái (mới, đã liên hệ, đã trả lời, quan tâm, họp, đề xuất, thắng, thua), ghi chú, ngày theo dõi, giá trị hợp đồng, lý do thua.</td><td>Lịch sử hoạt động và số liệu chuyển đổi.</td><td>Trạng thái chỉ tiến lên; danh sách "Đang chờ họ" nhắc lead nóng im lặng 3 ngày (không soạn tự động).</td></tr>
+<tr><td>UC-30</td><td>Người được giới thiệu</td><td>Khách chỉ sang người khác (liên hệ quản lý hoặc danh thiếp).</td><td>Có thể tạo lead mới từ liên hệ được giới thiệu.</td><td>Số không hợp lệ bị từ chối.</td></tr>
+<tr><td>UC-31</td><td>Đọc lại các cuộc trò chuyện</td><td>Pipeline: xem trước rồi áp dụng phân loại lại.</td><td>Trạng thái các lead được cập nhật theo luật mới.</td><td>Chỉ áp dụng sau khi xem trước.</td></tr>
+</table>
+
+<h3>F. Theo dõi và vận hành</h3>
+<table>
+<tr><th>Mã</th><th>Use case</th><th>Các bước chính</th><th>Kết quả</th><th>Nhánh phụ và lỗi</th></tr>
+<tr><td>UC-32</td><td>Xem tổng quan</td><td>Dashboard và Analytics.</td><td>Số lead, chiến dịch, chuyển đổi, hợp đồng, xu hướng.</td><td></td></tr>
+<tr><td>UC-33</td><td>Nhận thông báo</td><td>Chuông trên thanh trên cùng.</td><td>Số nháp chờ duyệt và tin cần chú ý.</td><td></td></tr>
+<tr><td>UC-34</td><td>Theo dõi chi phí AI</td><td>Mỗi lần gọi AI ghi mô hình, token, độ trễ.</td><td>Dữ liệu để biết khóa AI tốn bao nhiêu và gọi chậm ở đâu.</td><td></td></tr>
+<tr><td>UC-35</td><td>Tự lưu trữ</td><td>Quản trị cài bằng Docker Compose (Postgres + pgvector, Redis), đặt biến môi trường.</td><td>Hệ thống chạy; API từ chối khởi động nếu thiếu biến bắt buộc.</td><td>Trong CI đặt <code>WHATSAPP_DISABLED=true</code> để bộ gửi và Baileys tắt.</td></tr>
+</table>
+
+<h2>4. Dữ liệu chính</h2>
 <table>
 <tr><th>Bảng</th><th>Vai trò</th></tr>
 <tr><td><code>Workspace</code>, <code>WorkspaceMember</code></td><td>Một doanh nghiệp; mọi bảng dưới đây đều có <code>workspaceId</code></td></tr>
@@ -158,7 +227,7 @@ tr:last-child td{border-bottom:0}
 <tr><td><code>UsageEvent</code></td><td>Mỗi lần gọi AI: mô hình, token, độ trễ</td></tr>
 </table>
 
-<h2>4. Quy tắc bất biến</h2>
+<h2>5. Quy tắc bất biến</h2>
 <ul class="rules">
 <li>Không tin nào được gửi nếu chưa qua <code>MessagingService.approve</code>.</li>
 <li>Người gửi nhận phần việc bằng một lệnh <code>updateMany</code> nguyên tử; tin còn ở trạng thái sending sau khi khởi động lại bị đánh dấu lỗi, không bao giờ gửi lại.</li>
