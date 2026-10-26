@@ -202,7 +202,7 @@ Lead scoring gives no phone points to a landline or service number (text "Landli
 | **Backend** | NestJS 10, Prisma ORM, REST API with Swagger |
 | **Database** | PostgreSQL 16 with pgvector |
 | **Queue** | BullMQ and Redis 7 for scraping jobs |
-| **AI** | Any OpenAI-compatible provider: OpenAI, OpenRouter, Ollama |
+| **AI** | Any OpenAI-compatible provider: OpenAI, Google Gemini, OpenRouter, Ollama (pick one in Settings → AI; it fills the base URL and models) |
 | **Scraping and site reading** | Playwright with headless Chromium, behind a proxy that refuses private addresses |
 | **Documents** | `unpdf` for PDF (in a worker thread), `fflate` for DOCX |
 | **WhatsApp** | Baileys (linked device) |

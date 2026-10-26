@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Key, Zap, Users, Shield, Globe, Loader2, Trash2, Plus, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { api } from "@/lib/api";
+import { AI_PROVIDERS, keyMismatch, providerById, providerFromBaseUrl, type ProviderId } from "@/lib/ai-providers";
 import { useAuth } from "@/hooks/use-auth";
 import { getInitials } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
@@ -187,6 +188,16 @@ export function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  /** Fills Base URL and model names from a preset; the key is never touched. "Custom" keeps what is typed. */
+  const pickProvider = (id: ProviderId) => {
+    const p = providerById(id);
+    if (!p || id === "custom") return;
+    setOpenaiBase(p.baseURL);
+    setOpenaiModel(p.model);
+    setOpenaiEmbed(p.embeddingModel);
+  };
+  const mismatch = keyMismatch(openaiKey, openaiBase);
+
   const saveAiIntegration = async () => {
     setSavingIntegration(true);
     setAiError("");
@@ -335,6 +346,31 @@ export function SettingsPage() {
                 <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("ai.stale.style")}</p>
               )}
 
+              <div className="space-y-2">
+                <Label htmlFor="ai-provider">{t("ai.provider")}</Label>
+                <select
+                  id="ai-provider"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={providerFromBaseUrl(openaiBase).id}
+                  onChange={(e) => pickProvider(e.target.value as ProviderId)}
+                >
+                  {AI_PROVIDERS.filter((p) => p.id !== "custom" || providerFromBaseUrl(openaiBase).id === "custom").map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">{t("ai.providerHint")}</p>
+                {providerFromBaseUrl(openaiBase).id === "gemini" && (
+                  <p className="text-xs text-muted-foreground">{t("ai.geminiHint")}</p>
+                )}
+              </div>
+              {mismatch && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm space-y-2">
+                  <p>{t("ai.mismatch", { provider: providerById(mismatch.suggest)?.label ?? "" })}</p>
+                  <Button size="sm" variant="outline" onClick={() => pickProvider(mismatch.suggest)}>
+                    {t("ai.mismatchFix", { provider: providerById(mismatch.suggest)?.label ?? "" })}
+                  </Button>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="ai-key">{t("settings.ai.keyLabel")}</Label>
                 <div className="flex gap-2">
