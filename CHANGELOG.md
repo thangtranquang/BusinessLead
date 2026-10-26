@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26
+
+### Clearer AI provider setup — 07:52 UTC
+**Summary:** Settings now lets you pick Google Gemini (or OpenAI, OpenRouter, Ollama) so a key goes to the right provider.
+**Details:** A provider picker fills the base URL and model names (never the key), the key label no longer says OpenAI, and a warning appears when a Gemini or OpenRouter key is entered with an empty base URL, which used to send it to OpenAI and fail.
+
 ## 2026-10-24
 
 ### Vietnam market support — 18:34 UTC
