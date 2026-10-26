@@ -4,6 +4,7 @@ import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from "@nestjs/swagger"
 import { LeadsService } from "./leads.service";
 import { EnrichmentService } from "./enrichment.service";
 import { GeoService } from "./geo.service";
+import { ReassessService } from "./reassess.service";
 import { UpdateCrmDto } from "./dto/update-crm.dto";
 import { IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import { JwtGuard } from "../auth/jwt.guard";
@@ -19,7 +20,7 @@ export class ReferralDto {
 @UseGuards(JwtGuard)
 @Controller("leads")
 export class LeadsController {
-  constructor(private readonly leadsService: LeadsService, private readonly enrichment: EnrichmentService, private readonly geo: GeoService) {}
+  constructor(private readonly leadsService: LeadsService, private readonly enrichment: EnrichmentService, private readonly geo: GeoService, private readonly reassess: ReassessService) {}
 
   @Get()
   @ApiOperation({ summary: "List all leads" })
@@ -81,6 +82,13 @@ export class LeadsController {
   @ApiOperation({ summary: "Province / kabupaten-kota / kecamatan with lead counts, and how far the area lookup has got" })
   async regions(@WorkspaceId() workspaceId: string, @Query("campaignId") campaignId?: string) {
     return { regions: await this.leadsService.regions(workspaceId, campaignId), geo: await this.geo.status(workspaceId) };
+  }
+
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post("reassess/campaign/:campaignId")
+  @ApiOperation({ summary: "Judge fit again for the campaign's leads that never got a verdict (up to 200 per call), e.g. after fixing the AI key" })
+  reassessCampaign(@Param("campaignId") campaignId: string, @WorkspaceId() workspaceId: string) {
+    return this.reassess.reassessCampaign(workspaceId, campaignId);
   }
 
   @Throttle({ default: { limit: 5, ttl: 60_000 } })

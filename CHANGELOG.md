@@ -2,6 +2,10 @@
 
 ## 2026-10-26
 
+### Re-judge lead fit — 08:12 UTC
+**Summary:** Leads scanned before the AI key worked can now be scored again without scanning again.
+**Details:** New endpoint POST /api/leads/reassess/campaign/:campaignId judges fit again for leads without a verdict and updates score and priority. Up to 200 leads per call; call again for the rest.
+
 ### Clearer AI provider setup — 07:52 UTC
 **Summary:** Settings now lets you pick Google Gemini (or OpenAI, OpenRouter, Ollama) so a key goes to the right provider.
 **Details:** A provider picker fills the base URL and model names (never the key), the key label no longer says OpenAI, and a warning appears when a Gemini or OpenRouter key is entered with an empty base URL, which used to send it to OpenAI and fail.
